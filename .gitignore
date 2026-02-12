@@ -10,3 +10,6 @@ lib/
 # 忽略已经生成的 lua 执行文件
 lua
 src/lua
+
+!clients/lua/
+!clients/lib/
