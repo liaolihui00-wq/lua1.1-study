@@ -1,0 +1,12 @@
+# 忽略编译产生的文件
+*.o
+*.a
+*.so*
+lib/
+
+# 忽略 VS Code 自动生成的配置
+.vscode/
+
+# 忽略已经生成的 lua 执行文件
+lua
+src/lua
