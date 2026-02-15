@@ -96,8 +96,8 @@ typedef enum
  T_USERDATA//用户数据对象，表示一个由C语言定义的任意数据结构，可以被Lua操作，但Lua本身不关心它的内部结构
 } Type; //Lua对象的类型枚举，表示Lua中的不同数据类型，如nil、数字、字符串、表、函数、C函数和用户数据等
 
-typedef void (*Cfunction) (void);
-typedef int  (*Input) (void);
+typedef void (*Cfunction) (void);//C函数指针类型，表示一个C语言函数，可以被Lua调用，参数和返回值由具体的函数定义决定
+typedef int  (*Input) (void);//输入函数指针类型，表示一个函数，用于从某个输入源（如文件、字符串等）读取数据
 
 typedef union
 {
@@ -131,35 +131,38 @@ typedef struct
 #define uvalue(o)	((o)->value.u)//用户数据表
 
 /* Macros to access symbol table */
-#define s_name(i)	(lua_table[i].name)//
-#define s_object(i)	(lua_table[i].object)
-#define s_tag(i)	(tag(&s_object(i)))
-#define s_nvalue(i)	(nvalue(&s_object(i)))
-#define s_svalue(i)	(svalue(&s_object(i)))
-#define s_bvalue(i)	(bvalue(&s_object(i)))
-#define s_avalue(i)	(avalue(&s_object(i)))
-#define s_fvalue(i)	(fvalue(&s_object(i)))
-#define s_uvalue(i)	(uvalue(&s_object(i)))
+#define s_name(i)	(lua_table[i].name)//获取符号表中第i个符号的名字
+#define s_object(i)	(lua_table[i].object)//获取符号表中第i个符号的对象
+#define s_tag(i)	(tag(&s_object(i)))//获取符号表中第i个符号的对象的类型标签
+#define s_nvalue(i)	(nvalue(&s_object(i)))//获取符号表中第i个符号的对象的数字值
+#define s_svalue(i)	(svalue(&s_object(i)))//获取符号表中第i个符号的对象的字符串值
+#define s_bvalue(i)	(bvalue(&s_object(i)))//获取符号表中第i个符号的对象的字节值
+#define s_avalue(i)	(avalue(&s_object(i)))//获取符号表中第i个符号的对象的指针值
+#define s_fvalue(i)	(fvalue(&s_object(i)))//获取符号表中第i个符号的对象的函数指针值
+#define s_uvalue(i)	(uvalue(&s_object(i)))//获取符号表中第i个符号的对象的用户数据值
 
-#define get_word(code,pc)    {code.m.c1 = *pc++; code.m.c2 = *pc++;}
+#define get_word(code,pc)    {code.m.c1 = *pc++; code.m.c2 = *pc++;}//从指令流中获取一个字（Word）并存储到code中，pc是指令流的当前指针，获取后pc会自动移动到下一个位置
 #define get_float(code,pc)   {code.m.c1 = *pc++; code.m.c2 = *pc++;\
-                              code.m.c3 = *pc++; code.m.c4 = *pc++;}
+                              code.m.c3 = *pc++; code.m.c4 = *pc++;}//从指令流中获取一个浮点数（float）并存储到code中，pc是指令流的当前指针，获取后pc会自动移动到下一个位置
  
 
 
-/* Exported functions */
-int     lua_execute   (Byte *pc);
-void    lua_markstack (void);
-char   *lua_strdup (char *l);
+/* 
+**Exported functions 
+**opcode.c暴露出的接口，供Lua虚拟机的其他部分调用
+*/
+int     lua_execute   (Byte *pc);//执行Lua虚拟机的指令，pc是指令流的当前指针，返回一个整数表示执行结果，通常0表示成功，非0表示错误
+void    lua_markstack (void);//标记Lua栈的当前状态，通常在函数调用前使用，用于后续的栈调整和垃圾回收等操作
+char   *lua_strdup (char *l);//复制一个字符串l，返回一个新的字符串指针，新的字符串在内存中分配，调用者需要负责释放内存
 
-void    lua_setinput   (Input fn);	/* from "lex.c" module */
-char   *lua_lasttext   (void);		/* from "lex.c" module */
-int     lua_parse      (void); 		/* from "lua.stx" module */
-void    lua_type       (void);
-void 	lua_obj2number (void);
-void 	lua_print      (void);
-void 	lua_internaldofile (void);
-void 	lua_internaldostring (void);
-void    lua_travstack (void (*fn)(Object *));
+void    lua_setinput   (Input fn);	/* from "lex.c" module，设置读取代码的地方 */
+char   *lua_lasttext   (void);		/* from "lex.c" module ，返回最后读取的文本内容*/
+int     lua_parse      (void); 		/* from "lua.stx" module ，启动语法解析器，返回0表示成功*/
+void    lua_type       (void);//返回一个Lua对象的类型，参数是Lua栈上的一个对象，返回值是一个字符串，表示对象的类型
+void 	lua_obj2number (void);//将一个Lua对象转换为数字，参数是Lua栈上的一个对象，返回值是一个数字，如果对象不能转换为数字，则返回0
+void 	lua_print      (void);//打印Lua栈上的所有参数
+void 	lua_internaldofile (void);//通常被内部调用，用于在当前虚拟机状态下嵌套运行新的文件
+void 	lua_internaldostring (void);//通常被内部调用，用于在当前虚拟机状态下嵌套运行新的字符串
+void    lua_travstack (void (*fn)(Object *));//遍历栈，扫描所有的运行栈，对每个对象调用fn函数，通常用于垃圾回收等需要访问栈上对象的操作
 
 #endif
