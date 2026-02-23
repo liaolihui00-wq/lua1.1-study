@@ -10,10 +10,10 @@ char *rcs_mathlib="$Id: mathlib.c,v 1.1 1993/12/17 18:41:19 celes Exp $";
 
 #include "lua.h"
 
-#define TODEGREE(a) ((a)*180.0/3.14159)
-#define TORAD(a)    ((a)*3.14159/180.0)
+#define TODEGREE(a) ((a)*180.0/3.14159)//宏定义TODEGREE，用于将弧度转换为角度
+#define TORAD(a)    ((a)*3.14159/180.0)//宏定义TORAD，用于将角度转换为弧度
 
-static void math_abs (void)
+static void math_abs (void)//返回数字的绝对值，Lua接口：n = abs (number)，其中n表示绝对值，如果参数不是数字则抛出错误
 {
  double d;
  lua_Object o = lua_getparam (1);
@@ -27,7 +27,7 @@ static void math_abs (void)
 }
 
 
-static void math_sin (void)
+static void math_sin (void)//返回数字的正弦值，Lua接口：n = sin (number)，其中n表示正弦值，如果参数不是数字则抛出错误
 {
  double d;
  lua_Object o = lua_getparam (1);
@@ -41,7 +41,7 @@ static void math_sin (void)
 
 
 
-static void math_cos (void)
+static void math_cos (void)//返回数字的余弦值，Lua接口：n = cos (number)，其中n表示余弦值，如果参数不是数字则抛出错误
 {
  double d;
  lua_Object o = lua_getparam (1);
@@ -55,7 +55,7 @@ static void math_cos (void)
 
 
 
-static void math_tan (void)
+static void math_tan (void)//返回数字的正切值，Lua接口：n = tan (number)，其中n表示正切值，如果参数不是数字则抛出错误
 {
  double d;
  lua_Object o = lua_getparam (1);
@@ -68,7 +68,7 @@ static void math_tan (void)
 }
 
 
-static void math_asin (void)
+static void math_asin (void)//返回数字的反正弦值，Lua接口：n = asin (number)，其中n表示反正弦值，如果参数不是数字则抛出错误
 {
  double d;
  lua_Object o = lua_getparam (1);
@@ -81,7 +81,7 @@ static void math_asin (void)
 }
 
 
-static void math_acos (void)
+static void math_acos (void)//返回数字的反余弦值，Lua接口：n = acos (number)，其中n表示反余弦值，如果参数不是数字则抛出错误
 {
  double d;
  lua_Object o = lua_getparam (1);
@@ -95,7 +95,7 @@ static void math_acos (void)
 
 
 
-static void math_atan (void)
+static void math_atan (void)//返回数字的反正切值，Lua接口：n = atan (number)，其中n表示反正切值，如果参数不是数字则抛出错误
 {
  double d;
  lua_Object o = lua_getparam (1);
@@ -108,7 +108,7 @@ static void math_atan (void)
 }
 
 
-static void math_ceil (void)
+static void math_ceil (void)//返回数字的上限值，Lua接口：n = ceil (number)，其中n表示上限值，如果参数不是数字则抛出错误
 {
  double d;
  lua_Object o = lua_getparam (1);
@@ -121,7 +121,7 @@ static void math_ceil (void)
 }
 
 
-static void math_floor (void)
+static void math_floor (void)//返回数字的下限值，Lua接口：n = floor (number)，其中n表示下限值，如果参数不是数字则抛出错误
 {
  double d;
  lua_Object o = lua_getparam (1);
@@ -133,7 +133,7 @@ static void math_floor (void)
  lua_pushnumber (floor(d));
 }
 
-static void math_mod (void)
+static void math_mod (void)//返回两个数字的模，Lua接口：n = mod (number1, number2)，其中n表示模，如果参数不是数字则抛出错误
 {
  int d1, d2;
  lua_Object o1 = lua_getparam (1);
@@ -146,7 +146,7 @@ static void math_mod (void)
 }
 
 
-static void math_sqrt (void)
+static void math_sqrt (void)//返回数字的平方根，Lua接口：n = sqrt (number)，其中n表示平方根，如果参数不是数字则抛出错误
 {
  double d;
  lua_Object o = lua_getparam (1);
@@ -158,7 +158,7 @@ static void math_sqrt (void)
  lua_pushnumber (sqrt(d));
 }
 
-static void math_pow (void)
+static void math_pow (void)//返回数字的幂，Lua接口：n = pow (number1, number2)，其中n表示幂，如果参数不是数字则抛出错误
 {
  double d1, d2;
  lua_Object o1 = lua_getparam (1);
@@ -170,7 +170,7 @@ static void math_pow (void)
  lua_pushnumber (pow(d1,d2));
 }
 
-static void math_min (void)
+static void math_min (void)//返回一组数字中的最小值，Lua接口：n = min (number1, number2, ...)，其中n表示最小值，如果参数不是数字则抛出错误
 {
  int i=1;
  double d, dmin;
@@ -191,7 +191,7 @@ static void math_min (void)
 }
 
 
-static void math_max (void)
+static void math_max (void)//返回一组数字中的最大值，Lua接口：n = max (number1, number2, ...)，其中n表示最大值，如果参数不是数字则抛出错误
 {
  int i=1;
  double d, dmax;
@@ -216,7 +216,7 @@ static void math_max (void)
 /*
 ** Open math library
 */
-void mathlib_open (void)
+void mathlib_open (void)//数学函数库的初始化函数，提供基本的数学运算功能，如三角函数、指数函数等
 {
  lua_register ("abs",   math_abs);
  lua_register ("sin",   math_sin);

@@ -7,7 +7,7 @@
 
 #ifndef strlib_h
 
-void strlib_open (void);
+void strlib_open (void);//字符串库的初始化函数，提供字符串操作功能，如字符串连接、子串提取等
 
 #endif
 

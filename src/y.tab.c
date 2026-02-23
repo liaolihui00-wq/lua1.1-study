@@ -15,52 +15,51 @@ char *rcs_luastx = "$Id: lua.stx,v 2.4 1994/04/20 16:22:21 celes Exp $";
 #include "table.h"
 #include "lua.h"
 
-#define LISTING 0
+#define LISTING 0//是否生成汇编代码列表的标志，0表示不生成，1表示生成，以便在编译过程中输出详细的汇编代码信息，方便调试和分析Lua虚拟机的执行过程
 
 #ifndef GAPCODE
-#define GAPCODE 50
+#define GAPCODE 50//代码缓冲区的增长步长，表示当代码缓冲区满时，每次增加的字节数，以便在编译过程中动态扩展代码缓冲区的大小，避免内存溢出
 #endif
-static Word   maxcode;
-static Word   maxmain;
-static Word   maxcurr ;
-static Byte  *code = NULL;
-static Byte  *initcode;
-static Byte  *basepc;
-static Word   maincode;
-static Word   pc;
+static Word   maxcode;//代码缓冲区的最大容量，表示代码缓冲区当前的总大小，以便在编译过程中检查代码缓冲区是否需要扩展
+static Word   maxmain;//主代码的最大容量，表示主代码部分的大小限制
+static Word   maxcurr ;//当前代码的容量，表示当前已经生成的代码的字节数
+static Byte  *code = NULL;//代码缓冲区的指针，指向存储生成的代码的内存区域，Lua编译器将生成的字节码指令存储在这个缓冲区中，以便后续执行
+static Byte  *initcode;//初始代码的指针，指向代码缓冲区的起始位置
+static Byte  *basepc;//代码缓冲区的基地址，指向代码缓冲区的起始位置
+static Word   maincode;//主代码的起始位置，表示主代码部分在代码缓冲区中的偏移位置
+static Word   pc;//程序计数器，表示当前正在生成的代码的字节偏移位置
 
-#define MAXVAR 32
-static long    varbuffer[MAXVAR];    /* variables in an assignment list;
-				it's long to store negative Word values */
+#define MAXVAR 32//变量缓冲区的最大容量，表示在编译过程中用于存储变量信息的缓冲区的大小
+static long    varbuffer[MAXVAR];//变量缓冲区的静态数组，用于在编译过程中存储变量信息，如局部变量、全局变量等
 static int     nvarbuffer=0;	     /* number of variables at a list */
 
-static Word    localvar[STACKGAP];   /* store local variable names */
+static Word    localvar[STACKGAP];   /* store local variable names *///变量表的静态数组，用于在编译过程中存储局部变量的名称
 static int     nlocalvar=0;	     /* number of local variables */
 
 #define MAXFIELDS FIELDS_PER_FLUSH*2
-static Word    fields[MAXFIELDS];     /* fieldnames to be flushed */
+static Word    fields[MAXFIELDS];     /* fieldnames to be flushed *///字段表的静态数组，用于在编译过程中存储构造表时需要刷新到内存中的字段名称
 static int     nfields=0;
-static int     ntemp;		     /* number of temporary var into stack */
-static int     err;		     /* flag to indicate error */
+static int     ntemp;		     /* number of temporary var into stack *///临时变量的数量，表示在编译过程中用于存储临时计算结果的变量数量
+static int     err;		     /* flag to indicate error *///错误标志，表示在编译过程中是否发生了错误，如果发生错误，编译器将设置这个标志以便后续处理
 
 /* Internal functions */
 
-static void code_byte (Byte c)
+static void code_byte (Byte c)//内部函数：将一个字节c编码到代码缓冲区中
 {
- if (pc>maxcurr-2)  /* 1 byte free to code HALT of main code */
+ if (pc>maxcurr-2)  /* 1 byte free to code HALT of main code *///代码缓冲区已经满了，剩下的空间不足以容纳一个字节的指令和一个字节的HALT指令，此时需要扩展代码缓冲区
  {
   maxcurr += GAPCODE;
-  basepc = (Byte *)realloc(basepc, maxcurr*sizeof(Byte));
+  basepc = (Byte *)realloc(basepc, maxcurr*sizeof(Byte));//重新分配代码缓冲区的内存，新的大小为maxcurr字节
   if (basepc == NULL)
   {
    lua_error ("not enough memory");
    err = 1;
-  }
+  }	
  }
  basepc[pc++] = c;
 }
 
-static void code_word (Word n)
+static void code_word (Word n)//内部函数：将一个字n编码到代码缓冲区中，适用于在编译过程中生成字节码指令时将指令的操作码和操作数编码到代码缓冲区中
 {
  CodeWord code;
  code.w = n;
@@ -68,7 +67,7 @@ static void code_word (Word n)
  code_byte(code.m.c2);
 }
 
-static void code_float (float n)
+static void code_float (float n)//内部函数：将一个浮点数n编码到代码缓冲区中
 {
  CodeFloat code;
  code.f = n;
@@ -78,7 +77,7 @@ static void code_float (float n)
  code_byte(code.m.c4);
 }
 
-static void code_word_at (Byte *p, Word n)
+static void code_word_at (Byte *p, Word n)//内部函数：将一个字n编码到代码缓冲区的指定位置p
 {
  CodeWord code;
  code.w = n;
@@ -86,18 +85,18 @@ static void code_word_at (Byte *p, Word n)
  *p++ = code.m.c2;
 }
 
-static void push_field (Word name)
+static void push_field (Word name)//内部函数：将一个字段名称name推入字段表中，适用于在编译过程中构造表时需要记录字段名称以便后续刷新到内存中
 {
   if (nfields < STACKGAP-1)
     fields[nfields++] = name;
   else
   {
-   lua_error ("too many fields in a constructor");
+   lua_error ("too many fields in a constructor");//字段数量超过限制，报告错误并设置错误标志
    err = 1;
   }
 }
 
-static void flush_record (int n)
+static void flush_record (int n)//内部函数：将n个字段名称刷新到内存中，适用于在编译过程中构造表时需要将记录的字段名称刷新到内存中以便后续访问
 {
   int i;
   if (n == 0) return;
@@ -108,7 +107,7 @@ static void flush_record (int n)
   ntemp -= n;
 }
 
-static void flush_list (int m, int n)
+static void flush_list (int m, int n)//内部函数：将n个元素存储到一个列表位置中，适用于在编译过程中构造表时需要将列表元素存储到内存中以便后续访问
 {
   if (n == 0) return;
   if (m == 0)
@@ -122,7 +121,7 @@ static void flush_list (int m, int n)
   ntemp-=n;
 }
 
-static void incr_ntemp (void)
+static void incr_ntemp (void)//内部函数：增加临时变量的数量，适用于在编译过程中需要使用更多的临时变量来存储计算结果的情况
 {
  if (ntemp+nlocalvar+MAXVAR+1 < STACKGAP)
   ntemp++;
@@ -133,7 +132,7 @@ static void incr_ntemp (void)
  }
 }
 
-static void add_nlocalvar (int n)
+static void add_nlocalvar (int n)//内部函数：增加局部变量的数量，适用于在编译过程中需要定义更多的局部变量来存储数据的情况
 {
  if (ntemp+nlocalvar+MAXVAR+n < STACKGAP)
   nlocalvar += n;
@@ -144,7 +143,7 @@ static void add_nlocalvar (int n)
  }
 }
 
-static void incr_nvarbuffer (void)
+static void incr_nvarbuffer (void)//内部函数：增加变量缓冲区的数量，适用于在编译过程中需要记录更多的变量信息的情况
 {
  if (nvarbuffer < MAXVAR-1)
   nvarbuffer++;
@@ -155,8 +154,8 @@ static void incr_nvarbuffer (void)
  }
 }
 
-static void code_number (float f)
-{ Word i = (Word)f;
+static void code_number (float f)//内部函数：将一个数字f编码到代码缓冲区中
+{ Word i = (Word)f;//将浮点数f转换为一个整数i，准备进行编码
   if (f == (float)i)  /* f has an (short) integer value */
   {
    if (i <= 2) code_byte(PUSH0 + i);
@@ -189,7 +188,7 @@ typedef union
  char *pChar;
  Word  vWord;
  Byte *pByte;
-} YYSTYPE;
+} YYSTYPE;//定义了一个联合体类型YYSTYPE，用于在语法分析过程中存储不同类型的值，如整数、长整数、浮点数、字符串指针、字等
 # define WRONGTOKEN 257
 # define NIL 258
 # define IF 259
@@ -216,15 +215,15 @@ typedef union
 # define CONC 280
 # define UNARY 281
 # define NOT 282
-#define yyclearin yychar = -1
-#define yyerrok yyerrflag = 0
+#define yyclearin yychar = -1//清除当前输入符号，设置yychar为-1表示没有有效的输入符号
+#define yyerrok yyerrflag = 0//重置错误标志，设置yyerrflag为0表示没有发生错误
 extern int yychar;
 extern int yyerrflag;
 #ifndef YYMAXDEPTH
-#define YYMAXDEPTH 150
+#define YYMAXDEPTH 150//定义了语法分析栈的最大深度，表示在语法分析过程中允许的最大嵌套层数，以避免过深的递归导致栈溢出
 #endif
 YYSTYPE yylval, yyval;
-# define YYERRCODE 256
+# define YYERRCODE 256//定义了一个错误代码，表示在语法分析过程中发生错误时返回的代码值，以便在编译过程中进行错误处理和报告
 
 # line 622 "lua.stx"
 
@@ -232,7 +231,7 @@ YYSTYPE yylval, yyval;
 /*
 ** Search a local name and if find return its index. If do not find return -1
 */
-static int lua_localname (Word n)
+static int lua_localname (Word n)//内部函数：搜索一个局部变量名称n，如果找到则返回其索引，否则返回-1
 {
  int i;
  for (i=nlocalvar-1; i >= 0; i--)
@@ -245,15 +244,15 @@ static int lua_localname (Word n)
 ** indexed by (number -1). If negative, push local indexed by ABS(number)-1.
 ** Otherwise, if zero, push indexed variable (record).
 */
-static void lua_pushvar (long number)
+static void lua_pushvar (long number)//内部函数：根据给定的编号number推入一个变量
 { 
- if (number > 0)	/* global var */
+ if (number > 0)	/* global var *///如果number是正数，表示这是一个全局变量，编号为number-1，推入这个全局变量
  {
   code_byte(PUSHGLOBAL);
   code_word(number-1);
   incr_ntemp();
  }
- else if (number < 0)	/* local var */
+ else if (number < 0)	/* local var *///如果number是负数，表示这是一个局部变量，编号为ABS(number)-1，推入这个局部变量
  {
   number = (-number) - 1;
   if (number < 10) code_byte(PUSHLOCAL0 + number);
@@ -264,27 +263,27 @@ static void lua_pushvar (long number)
   }
   incr_ntemp();
  }
- else
+ else//如果number是0，表示这是一个索引变量（记录），推入这个索引变量
  {
   code_byte(PUSHINDEXED);
   ntemp--;
  }
 }
 
-static void lua_codeadjust (int n)
+static void lua_codeadjust (int n)//内部函数：生成一个调整指令，调整当前代码的偏移位置n
 {
  code_byte(ADJUST);
  code_byte(n + nlocalvar);
 }
 
-static void lua_codestore (int i)
+static void lua_codestore (int i)//内部函数：生成一个存储指令，将当前值存储到变量i中
 {
- if (varbuffer[i] > 0)		/* global var */
+ if (varbuffer[i] > 0)		/* global var *///如果varbuffer[i]是正数，表示这是一个全局变量，生成一个存储全局变量的指令，将当前值存储到这个全局变量中
  {
   code_byte(STOREGLOBAL);
   code_word(varbuffer[i]-1);
  }
- else if (varbuffer[i] < 0)      /* local var */
+ else if (varbuffer[i] < 0)      /* local var *///如果varbuffer[i]是负数，表示这是一个局部变量，生成一个存储局部变量的指令，将当前值存储到这个局部变量中
  {
   int number = (-varbuffer[i]) - 1;
   if (number < 10) code_byte(STORELOCAL0 + number);
@@ -294,17 +293,17 @@ static void lua_codestore (int i)
    code_byte(number);
   }
  }
- else				  /* indexed var */
+ else				  /* indexed var *///如果varbuffer[i]是0，表示这是一个索引变量（记录），生成一个存储索引变量的指令，将当前值存储到这个索引变量中
  {
   int j;
-  int upper=0;     	/* number of indexed variables upper */
-  int param;		/* number of itens until indexed expression */
+  int upper=0;     	/* number of indexed variables upper *///计算在当前变量i之后的变量中有多少个是索引变量（记录），以便确定存储索引变量的指令参数
+  int param;		/* number of itens until indexed expression *///计算从当前变量i到下一个索引变量（记录）之间的变量数量
   for (j=i+1; j <nvarbuffer; j++)
    if (varbuffer[j] == 0) upper++;
   param = upper*2 + i;
-  if (param == 0)
+  if (param == 0)//如果param是0，表示当前变量i之后没有索引变量（记录），直接生成一个存储索引变量的指令，参数为0
    code_byte(STOREINDEXED0);
-  else
+  else//如果param不是0，表示当前变量i之后有索引变量（记录），生成一个存储索引变量的指令，参数为param
   {
    code_byte(STOREINDEXED);
    code_byte(param);
@@ -312,7 +311,7 @@ static void lua_codestore (int i)
  }
 }
 
-void yyerror (char *s)
+void yyerror (char *s)//接受一个错误信息字符串s作为参数，生成一个详细的错误报告，包括错误信息、最后读取的文本内容、当前行号和正在处理的文件名，并调用lua_error函数抛出这个错误，同时设置错误标志err为1
 {
  static char msg[256];
  sprintf (msg,"%s near \"%s\" at line %d in file \"%s\"",
@@ -321,7 +320,7 @@ void yyerror (char *s)
  err = 1;
 }
 
-int yywrap (void)
+int yywrap (void)//当词法分析器扫描到输入的末尾时调用，返回1表示没有更多输入需要处理，结束词法分析过程
 {
  return 1;
 }
@@ -331,7 +330,7 @@ int yywrap (void)
 ** Parse LUA code and execute global statement.
 ** Return 0 on success or 1 on error.
 */
-int lua_parse (void)
+int lua_parse (void)//解析Lua代码并执行全局语句，返回0表示成功，返回1表示错误
 {
  Byte *init = initcode = (Byte *) calloc(GAPCODE, sizeof(Byte));
  maincode = 0; 
@@ -342,8 +341,8 @@ int lua_parse (void)
   return 1;
  }
  err = 0;
- if (yyparse () || (err==1)) return 1;
- initcode[maincode++] = HALT;
+ if (yyparse () || (err==1)) return 1;//调用语法分析器进行解析，如果解析过程中发生错误或者err标志被设置为1，返回1表示错误
+ initcode[maincode++] = HALT;//在主代码的末尾添加一个HALT指令，表示程序的结束
  init = initcode;
 #if LISTING
  PrintCode(init,init+maincode);
@@ -618,8 +617,8 @@ int yyexca[] ={
 	47, 34,
 	-2, 72,
 	};
-# define YYNPROD 103
-# define YYLAST 364
+# define YYNPROD 103//定义了语法规则的数量，表示在语法分析过程中使用的语法规则的总数
+# define YYLAST 364//定义了语法分析表的大小，表示在语法分析过程中使用的分析表的总大小
 int yyact[]={
 
     58,    56,    22,    57,   132,    59,    58,    56,   137,    57,
@@ -752,9 +751,9 @@ int yydef[]={
     80,     0,     0,     0,    27,     0,     0,    68,    84,     0,
     90,     8,    15,    25,     0,    17,    13,    86,    33,    32,
     27,    33,    24,    26 };
-typedef struct { char *t_name; int t_val; } yytoktype;
+typedef struct { char *t_name; int t_val; } yytoktype;//定义了一个结构体类型yytoktype，包含一个字符串指针t_name和一个整数t_val，用于表示词法分析器返回的标记类型和对应的值
 #ifndef YYDEBUG
-#	define YYDEBUG	0	/* don't allow debugging */
+#	define YYDEBUG	0	/* don't allow debugging *///定义YYDEBUG，则将其定义为0，表示不允许调试模式
 #endif
 
 #if YYDEBUG
