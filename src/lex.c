@@ -141,8 +141,14 @@ int yylex ()//词法分析函数，负责从输入中读取字符并识别出一
   
       case '~'://不等于号，‘~’是错误的token但是依旧截取，这里只负责分词，不负责语法分析；‘~=’是不等于号
         save_and_next();
-        if (current != '=') return '~';
-        else { save_and_next(); return NE; }
+        return '~';
+        // if (current != '=') return '~';
+        // else { save_and_next(); return NE; }//去除以前的‘~=’为不等号的写法，改用‘！=’的写法
+
+      case '!':
+        save_and_next();
+        if (current != '=') return '!';
+        else { save_and_next(); return NE; }//使用更符合普遍人的认识的不等号写法‘！=’
 
       case '"':
       case '\''://字符串提取，当遇到双引号或者单引号时，表示开始识别一个字符串常量，继续读取字符直到遇到相同的定界符为止，在这个过程中处理转义字符，并将识别到的字符串内容保存到yytext数组中，最后将这个字符串常量存入常量表，并返回STRING token
