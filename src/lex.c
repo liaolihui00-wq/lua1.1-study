@@ -126,8 +126,8 @@ int yylex ()//词法分析函数，负责从输入中读取字符并识别出一
       case '-'://减号与注释‘-’是减号，‘--’是注释
         save_and_next();
         if (current != '-') return '-';
-        do { next(); } while (current != '\n' && current != 0);//当遇到注释时，继续读取字符直到遇到换行符'\n'或者输入结束0，跳过了注释内容
-        continue;
+        // do { next(); } while (current != '\n' && current != 0);//当遇到注释时，继续读取字符直到遇到换行符'\n'或者输入结束0，跳过了注释内容
+        // continue;
   
       case '<'://小于号与小于等于号，‘<’是小于号，‘<=’是小于等于号
         save_and_next();
@@ -226,6 +226,33 @@ fraction: while (isdigit(current)) save_and_next();
         *yytextLast = 0;
         yylval.vFloat = atof(yytext);//将识别到的数字常量转换为浮点数，并存储在yylval.vFloat中，以供语法分析器使用，最后返回NUMBER token
         return NUMBER;
+      
+      case '/':
+          next();
+          if( current == '/'){//单行注释//
+            do{ next(); }while( current != '\n' && current != 0 ) ;
+            continue;
+          }
+          else if(current == '*'){//多行注释/*
+            while(1){
+              next();
+              if(current == 0){
+                lua_reportbug("unterminated comment");//如果遇到文件结尾则报告错误
+                break;
+              }
+              if( current == '*'){
+                next();
+                if( current == '/'){//遇到*/则表示多行注释结束
+                  next();
+                  break;
+                }
+              }
+            }
+            continue;
+          }
+          else{//如果单纯的/表示除法
+            return '/';
+          }
 
       default: 		/* also end of file *///当遇到其他字符时，表示这是一个单独的符号token，直接返回这个字符的ASCII码作为token值，同时保存这个字符到yytext数组中
       {
