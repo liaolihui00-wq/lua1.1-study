@@ -21,7 +21,12 @@ $(DLIB): $(OBJS)
 	ld -o $@ $(OBJS)
 
 y.tab.c: lua.stx exscript
-	yacc -d lua.stx ; ex y.tab.c <exscript
+	# 1. 运行 yacc，产物先在当前目录
+	yacc -d lua.stx
+	# 2. 立即将产物移动到上一级目录 (src)
+	mv y.tab.c y.tab.h ../
+	# 3. 在上一级目录执行 ex 脚本（注意路径也要变）
+	ex ../y.tab.c <exscript
 
 clean:
 	rm -f $(OBJS) $(SLIB) $(DLIB)
