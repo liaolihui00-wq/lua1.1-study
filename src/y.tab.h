@@ -72,14 +72,18 @@ extern int yydebug;
     STRING = 273,                  /* STRING  */
     NAME = 274,                    /* NAME  */
     DEBUG = 275,                   /* DEBUG  */
-    AND = 276,                     /* AND  */
-    OR = 277,                      /* OR  */
-    NE = 278,                      /* NE  */
-    LE = 279,                      /* LE  */
-    GE = 280,                      /* GE  */
-    CONC = 281,                    /* CONC  */
-    UNARY = 282,                   /* UNARY  */
-    NOT = 283                      /* NOT  */
+    ADDEQ = 276,                   /* ADDEQ  */
+    SUBEQ = 277,                   /* SUBEQ  */
+    MULTEQ = 278,                  /* MULTEQ  */
+    DIVEQ = 279,                   /* DIVEQ  */
+    AND = 280,                     /* AND  */
+    OR = 281,                      /* OR  */
+    NE = 282,                      /* NE  */
+    LE = 283,                      /* LE  */
+    GE = 284,                      /* GE  */
+    CONC = 285,                    /* CONC  */
+    UNARY = 286,                   /* UNARY  */
+    NOT = 287                      /* NOT  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -106,20 +110,24 @@ extern int yydebug;
 #define STRING 273
 #define NAME 274
 #define DEBUG 275
-#define AND 276
-#define OR 277
-#define NE 278
-#define LE 279
-#define GE 280
-#define CONC 281
-#define UNARY 282
-#define NOT 283
+#define ADDEQ 276
+#define SUBEQ 277
+#define MULTEQ 278
+#define DIVEQ 279
+#define AND 280
+#define OR 281
+#define NE 282
+#define LE 283
+#define GE 284
+#define CONC 285
+#define UNARY 286
+#define NOT 287
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 201 "lua.stx"
+#line 203 "lua.stx"
 
  int   vInt;
  long  vLong;
@@ -128,7 +136,7 @@ union YYSTYPE
  Word  vWord;
  Byte *pByte;
 
-#line 132 "y.tab.h"
+#line 140 "y.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

@@ -55,6 +55,8 @@ void lua_codeadjust (int n);
 void lua_codestore (int n);
 int  lua_localname (Word n);
 
+//新增code_compound_finish（）函数，供+=、-=等使用
+void code_compound_finish(long var_info, int op_code);
 
 
 
@@ -219,6 +221,8 @@ static void code_number (float f)//内部函数：将一个数字f编码到代�
 %token <pChar>   NAME 
 %token <vInt>   DEBUG
 
+%token ADDEQ SUBEQ MULTEQ DIVEQ
+
 %type <vWord> PrepJump
 %type <vInt>  expr, exprlist, exprlist1, varlist1, typeconstructor
 %type <vInt>  fieldlist, localdeclist
@@ -363,6 +367,15 @@ stat1  : IF expr1 THEN PrepJump block PrepJump elsepart END
 	  lua_codeadjust (0);
 	}
        } 
+       | var ADDEQ { lua_pushvar($1); } expr1
+        { code_compound_finish($1, ADDOP); ntemp--; }
+       | var SUBEQ { lua_pushvar($1); } expr1
+        { code_compound_finish($1, SUBOP); ntemp--; }
+       | var MULTEQ { lua_pushvar($1); } expr1
+        { code_compound_finish($1, MULTOP); ntemp--; }
+       | var DIVEQ { lua_pushvar($1); } expr1
+        { code_compound_finish($1, DIVOP); ntemp--; }
+
        | functioncall			{ lua_codeadjust (0); }
        | typeconstructor                { lua_codeadjust (0); }
        | LOCAL localdeclist decinit   { add_nlocalvar($2); lua_codeadjust (0); }
@@ -761,6 +774,19 @@ int lua_parse (void)//解析Lua代码并执行全局语句，返回0表示成功
  return 0;
 }
 
+
+/* 封装复合赋值的后半段逻辑：运算 + 存储 */
+void code_compound_finish(long var_info, int op_code) {
+    code_byte(op_code);
+    /*判断变量类型并生成存储指令 */
+    if (var_info > 0) { /* 全局变量 (符号表索引+1) */
+        code_byte(STOREGLOBAL);
+        code_word(var_info - 1);
+    } else { /* 局部变量 (栈偏移取反) */
+        code_byte(STORELOCAL);
+        code_byte(-(var_info + 1));
+    }
+}
 
 #if LISTING
 /*

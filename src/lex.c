@@ -125,9 +125,11 @@ int yylex ()//词法分析函数，负责从输入中读取字符并识别出一
   
       case '-'://减号与注释‘-’是减号，‘--’是注释
         save_and_next();
-        if (current != '-') return '-';
+        // if (current != '-') return '-';
         // do { next(); } while (current != '\n' && current != 0);//当遇到注释时，继续读取字符直到遇到换行符'\n'或者输入结束0，跳过了注释内容
         // continue;
+        if (current != '=') return '-';
+        else { save_and_next(); return SUBEQ; }//增加-=功能
   
       case '<'://小于号与小于等于号，‘<’是小于号，‘<=’是小于等于号
         save_and_next();
@@ -256,9 +258,23 @@ fraction: while (isdigit(current)) save_and_next();
             }
             continue;
           }
+          else if(current == '='){
+            next();
+            return DIVEQ;//增加/=功能
+          }
           else{//如果单纯的/表示除法
             return '/';
           }
+      case '+':{
+        save_and_next();
+        if (current != '=') return '+';
+        else { save_and_next(); return ADDEQ; }//增加+=功能
+      }
+      case '*':{
+        save_and_next();
+        if (current != '=') return '*';
+        else { save_and_next(); return MULTEQ; }//增加*=功能
+      }
 
       default: 		/* also end of file *///当遇到其他字符时，表示这是一个单独的符号token，直接返回这个字符的ASCII码作为token值，同时保存这个字符到yytext数组中
       {
