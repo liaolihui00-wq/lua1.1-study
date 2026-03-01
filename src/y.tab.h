@@ -127,7 +127,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 203 "lua.stx"
+#line 214 "lua.stx"
 
  int   vInt;
  long  vLong;

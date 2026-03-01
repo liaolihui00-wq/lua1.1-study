@@ -42,6 +42,12 @@ static int     ntemp;		    //临时变量的数量
 static int     err;		     //错误标志，表示在编译过程中是否发生了错误，如果发生错误，编译器将设置这个标志以便后续处理
 
 
+/* 静态变量：用于在编译匿名函数时备份主程序的进度 */
+static Byte *save_basepc;
+static int save_pc;
+static int save_maxcurr;
+static int save_nlocalvar;
+static int save_ntemp;
 
 
 /* 声明加在 lua.stx 头部的 %{ 和 %} 之间 */
@@ -57,6 +63,11 @@ int  lua_localname (Word n);
 
 //新增code_compound_finish（）函数，供+=、-=等使用
 void code_compound_finish(long var_info, int op_code);
+
+//开启函数编译作用域
+void lua_begin_scope(int symbol_idx);
+//结束函数编译作用域
+void lua_end_scope(int symbol_idx);
 
 
 
@@ -256,46 +267,43 @@ functionlist : /* empty */
 	     | functionlist setdebug
 	     ;
 	     
+/* 非匿名函数的构造*/	     
 function     : FUNCTION NAME 
 	       {
-		if (code == NULL)	/* first function */
-		{
-		 code = (Byte *) calloc(GAPCODE, sizeof(Byte));
-		 if (code == NULL)
-		 {
-		  lua_error("not enough memory");
-		  err = 1;
-		 }
-		 maxcode = GAPCODE;
-		}
-		pc=0; basepc=code; maxcurr=maxcode; 
-		nlocalvar=0;
-		$<vWord>$ = lua_findsymbol($2); 
+                $<vWord>$ = lua_findsymbol($2); 
+                lua_begin_scope($<vWord>$);
 	       }
 	       '(' parlist ')' 
+           { 
+                lua_codeadjust(0); 
+            }
+            block
+            END 	 
 	       {
-	        if (lua_debug)
-		{
-	         code_byte(SETFUNCTION); 
-                 code_word(lua_nfile-1);
-		 code_word($<vWord>3);
-		}
-	        lua_codeadjust (0);
+            lua_end_scope($<vWord>3);
+#if LISTING
+PrintCode(code,code+pc);
+#endif
 	       }
-               block
-               END 	 
+	       ;
+
+/*匿名函数的构造*/
+anonymous_function:'(' FUNCTION 
+            {
+                $<vWord>$ = lua_findsymbol("__ANONYMOUS_FUN"); 
+                lua_begin_scope($<vWord>$);
+            }
+            '(' parlist ')'
+            { 
+                lua_codeadjust(0); 
+            } 
+            block
+            END ')'	 
 	       { 
-                if (lua_debug) code_byte(RESET); 
-	        code_byte(RETCODE); code_byte(nlocalvar);
-	        s_tag($<vWord>3) = T_FUNCTION;
-	        s_bvalue($<vWord>3) = calloc (pc, sizeof(Byte));
-		if (s_bvalue($<vWord>3) == NULL)
-		{
-		 lua_error("not enough memory");
-		 err = 1;
-		}
-	        memcpy (s_bvalue($<vWord>3), basepc, pc*sizeof(Byte));
-		code = basepc; maxcode=maxcurr;
+                lua_end_scope($<vWord>3); 
+                // 定义完立刻压栈，供 functioncall 使用
+                lua_pushvar($<vWord>3+1);
+
 #if LISTING
 PrintCode(code,code+pc);
 #endif
@@ -525,6 +533,7 @@ functioncall : functionvalue  {code_byte(PUSHMARK); $<vInt>$ = ntemp; incr_ntemp
                 '(' exprlist ')' { code_byte(CALLFUNC); ntemp = $<vInt>2-1;}
 
 functionvalue : var {lua_pushvar ($1); } 
+        | anonymous_function
 	      ;
 		
 exprlist  :	/* empty */		{ $$ = 1; }
@@ -787,6 +796,68 @@ void code_compound_finish(long var_info, int op_code) {
         code_byte(-(var_info + 1));
     }
 }
+
+
+
+// 开启函数编译作用域
+void lua_begin_scope(int symbol_idx) {
+    // 备份主程序现场
+    save_pc = pc;
+    save_basepc = basepc;
+    save_maxcurr = maxcurr;
+    save_nlocalvar = nlocalvar;
+    save_ntemp = ntemp;
+
+    // 为匿名函数开辟全新的独立缓冲区
+    basepc = (Byte *) calloc(GAPCODE, sizeof(Byte));
+    if (basepc == NULL) lua_error("not enough memory");
+    
+    code = basepc;     // 切换当前写入指针到新内存
+    pc = 0;            // 匿名函数的代码从 0 开始
+    maxcurr = GAPCODE; // 新缓冲区的容量
+    nlocalvar = 0;     // 重置局部变量计数
+    ntemp = 0; // 匿名函数内部从 0 开始算临时变量
+
+    // 复用调试逻辑：标记当前正在编译哪个函数
+    if (lua_debug) {
+        code_byte(SETFUNCTION); 
+        code_word(lua_nfile - 1);
+        code_word(symbol_idx);
+    }
+}
+
+// 结束函数编译作用域
+void lua_end_scope(int symbol_idx) {
+    if (lua_debug) code_byte(RESET); 
+    
+    // 生成返回指令
+    code_byte(RETCODE); 
+    code_byte(nlocalvar);
+    
+    // 物理存储到符号表
+    s_tag(symbol_idx) = T_FUNCTION;
+    
+    // 内存安全：释放该槽位旧的代码
+    if (s_bvalue(symbol_idx)) free(s_bvalue(symbol_idx)); 
+    
+    s_bvalue(symbol_idx) = (Byte *) calloc(pc, sizeof(Byte));
+    if (s_bvalue(symbol_idx) == NULL) lua_error("not enough memory");
+    
+    memcpy(s_bvalue(symbol_idx), basepc, pc * sizeof(Byte));
+    
+    // 彻底恢复主程序的现场
+    basepc = save_basepc;
+    pc = save_pc;
+    maxcurr = save_maxcurr;
+    nlocalvar = save_nlocalvar;
+    ntemp = save_ntemp;
+    if (basepc == initcode) {
+        maincode = pc; 
+    }
+}
+
+
+
 
 #if LISTING
 /*

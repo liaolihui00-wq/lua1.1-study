@@ -111,6 +111,12 @@ static int     ntemp;		    //临时变量的数量
 static int     err;		     //错误标志，表示在编译过程中是否发生了错误，如果发生错误，编译器将设置这个标志以便后续处理
 
 
+/* 静态变量：用于在编译匿名函数时备份主程序的进度 */
+static Byte *save_basepc;
+static int save_pc;
+static int save_maxcurr;
+static int save_nlocalvar;
+static int save_ntemp;
 
 
 /* 声明加在 lua.stx 头部的 %{ 和 %} 之间 */
@@ -126,6 +132,11 @@ int  lua_localname (Word n);
 
 //新增code_compound_finish（）函数，供+=、-=等使用
 void code_compound_finish(long var_info, int op_code);
+
+//开启函数编译作用域
+void lua_begin_scope(int symbol_idx);
+//结束函数编译作用域
+void lua_end_scope(int symbol_idx);
 
 
 
@@ -266,7 +277,7 @@ static void code_number (float f)//内部函数：将一个数字f编码到代�
 }
 
 
-#line 271 "y.tab.c"
+#line 282 "y.tab.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -383,7 +394,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 203 "lua.stx"
+#line 214 "lua.stx"
 
  int   vInt;
  long  vLong;
@@ -392,7 +403,7 @@ union YYSTYPE
  Word  vWord;
  Byte *pByte;
 
-#line 397 "y.tab.c"
+#line 408 "y.tab.c"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -468,54 +479,57 @@ enum yysymbol_kind_t
   YYSYMBOL_function = 53,                  /* function  */
   YYSYMBOL_54_2 = 54,                      /* @2  */
   YYSYMBOL_55_3 = 55,                      /* $@3  */
-  YYSYMBOL_statlist = 56,                  /* statlist  */
-  YYSYMBOL_stat = 57,                      /* stat  */
-  YYSYMBOL_58_4 = 58,                      /* $@4  */
-  YYSYMBOL_sc = 59,                        /* sc  */
-  YYSYMBOL_stat1 = 60,                     /* stat1  */
-  YYSYMBOL_61_5 = 61,                      /* @5  */
-  YYSYMBOL_62_6 = 62,                      /* @6  */
-  YYSYMBOL_63_7 = 63,                      /* $@7  */
-  YYSYMBOL_64_8 = 64,                      /* $@8  */
-  YYSYMBOL_65_9 = 65,                      /* $@9  */
-  YYSYMBOL_66_10 = 66,                     /* $@10  */
-  YYSYMBOL_elsepart = 67,                  /* elsepart  */
-  YYSYMBOL_block = 68,                     /* block  */
-  YYSYMBOL_69_11 = 69,                     /* @11  */
-  YYSYMBOL_70_12 = 70,                     /* $@12  */
-  YYSYMBOL_ret = 71,                       /* ret  */
-  YYSYMBOL_72_13 = 72,                     /* $@13  */
-  YYSYMBOL_PrepJump = 73,                  /* PrepJump  */
-  YYSYMBOL_expr1 = 74,                     /* expr1  */
-  YYSYMBOL_expr = 75,                      /* expr  */
-  YYSYMBOL_76_14 = 76,                     /* $@14  */
-  YYSYMBOL_77_15 = 77,                     /* $@15  */
-  YYSYMBOL_typeconstructor = 78,           /* typeconstructor  */
-  YYSYMBOL_79_16 = 79,                     /* @16  */
-  YYSYMBOL_dimension = 80,                 /* dimension  */
-  YYSYMBOL_functioncall = 81,              /* functioncall  */
-  YYSYMBOL_82_17 = 82,                     /* @17  */
-  YYSYMBOL_functionvalue = 83,             /* functionvalue  */
-  YYSYMBOL_exprlist = 84,                  /* exprlist  */
-  YYSYMBOL_exprlist1 = 85,                 /* exprlist1  */
-  YYSYMBOL_86_18 = 86,                     /* $@18  */
-  YYSYMBOL_parlist = 87,                   /* parlist  */
-  YYSYMBOL_parlist1 = 88,                  /* parlist1  */
-  YYSYMBOL_objectname = 89,                /* objectname  */
-  YYSYMBOL_fieldlist = 90,                 /* fieldlist  */
-  YYSYMBOL_ffieldlist = 91,                /* ffieldlist  */
-  YYSYMBOL_ffieldlist1 = 92,               /* ffieldlist1  */
-  YYSYMBOL_ffield = 93,                    /* ffield  */
-  YYSYMBOL_94_19 = 94,                     /* @19  */
-  YYSYMBOL_lfieldlist = 95,                /* lfieldlist  */
-  YYSYMBOL_lfieldlist1 = 96,               /* lfieldlist1  */
-  YYSYMBOL_varlist1 = 97,                  /* varlist1  */
-  YYSYMBOL_var = 98,                       /* var  */
-  YYSYMBOL_99_20 = 99,                     /* $@20  */
-  YYSYMBOL_100_21 = 100,                   /* $@21  */
-  YYSYMBOL_localdeclist = 101,             /* localdeclist  */
-  YYSYMBOL_decinit = 102,                  /* decinit  */
-  YYSYMBOL_setdebug = 103                  /* setdebug  */
+  YYSYMBOL_anonymous_function = 56,        /* anonymous_function  */
+  YYSYMBOL_57_4 = 57,                      /* @4  */
+  YYSYMBOL_58_5 = 58,                      /* $@5  */
+  YYSYMBOL_statlist = 59,                  /* statlist  */
+  YYSYMBOL_stat = 60,                      /* stat  */
+  YYSYMBOL_61_6 = 61,                      /* $@6  */
+  YYSYMBOL_sc = 62,                        /* sc  */
+  YYSYMBOL_stat1 = 63,                     /* stat1  */
+  YYSYMBOL_64_7 = 64,                      /* @7  */
+  YYSYMBOL_65_8 = 65,                      /* @8  */
+  YYSYMBOL_66_9 = 66,                      /* $@9  */
+  YYSYMBOL_67_10 = 67,                     /* $@10  */
+  YYSYMBOL_68_11 = 68,                     /* $@11  */
+  YYSYMBOL_69_12 = 69,                     /* $@12  */
+  YYSYMBOL_elsepart = 70,                  /* elsepart  */
+  YYSYMBOL_block = 71,                     /* block  */
+  YYSYMBOL_72_13 = 72,                     /* @13  */
+  YYSYMBOL_73_14 = 73,                     /* $@14  */
+  YYSYMBOL_ret = 74,                       /* ret  */
+  YYSYMBOL_75_15 = 75,                     /* $@15  */
+  YYSYMBOL_PrepJump = 76,                  /* PrepJump  */
+  YYSYMBOL_expr1 = 77,                     /* expr1  */
+  YYSYMBOL_expr = 78,                      /* expr  */
+  YYSYMBOL_79_16 = 79,                     /* $@16  */
+  YYSYMBOL_80_17 = 80,                     /* $@17  */
+  YYSYMBOL_typeconstructor = 81,           /* typeconstructor  */
+  YYSYMBOL_82_18 = 82,                     /* @18  */
+  YYSYMBOL_dimension = 83,                 /* dimension  */
+  YYSYMBOL_functioncall = 84,              /* functioncall  */
+  YYSYMBOL_85_19 = 85,                     /* @19  */
+  YYSYMBOL_functionvalue = 86,             /* functionvalue  */
+  YYSYMBOL_exprlist = 87,                  /* exprlist  */
+  YYSYMBOL_exprlist1 = 88,                 /* exprlist1  */
+  YYSYMBOL_89_20 = 89,                     /* $@20  */
+  YYSYMBOL_parlist = 90,                   /* parlist  */
+  YYSYMBOL_parlist1 = 91,                  /* parlist1  */
+  YYSYMBOL_objectname = 92,                /* objectname  */
+  YYSYMBOL_fieldlist = 93,                 /* fieldlist  */
+  YYSYMBOL_ffieldlist = 94,                /* ffieldlist  */
+  YYSYMBOL_ffieldlist1 = 95,               /* ffieldlist1  */
+  YYSYMBOL_ffield = 96,                    /* ffield  */
+  YYSYMBOL_97_21 = 97,                     /* @21  */
+  YYSYMBOL_lfieldlist = 98,                /* lfieldlist  */
+  YYSYMBOL_lfieldlist1 = 99,               /* lfieldlist1  */
+  YYSYMBOL_varlist1 = 100,                 /* varlist1  */
+  YYSYMBOL_var = 101,                      /* var  */
+  YYSYMBOL_102_22 = 102,                   /* $@22  */
+  YYSYMBOL_103_23 = 103,                   /* $@23  */
+  YYSYMBOL_localdeclist = 104,             /* localdeclist  */
+  YYSYMBOL_decinit = 105,                  /* decinit  */
+  YYSYMBOL_setdebug = 106                  /* setdebug  */
 };
 typedef enum yysymbol_kind_t yysymbol_kind_t;
 
@@ -843,16 +857,16 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  2
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   238
+#define YYLAST   268
 
 /* YYNTOKENS -- Number of terminals.  */
 #define YYNTOKENS  50
 /* YYNNTS -- Number of nonterminals.  */
-#define YYNNTS  54
+#define YYNNTS  57
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  111
+#define YYNRULES  115
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  187
+#define YYNSTATES  198
 
 /* YYMAXUTOK -- Last valid token kind.  */
 #define YYMAXUTOK   287
@@ -904,18 +918,18 @@ static const yytype_int8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,   245,   245,   247,   246,   255,   256,   260,   276,   259,
-     305,   306,   309,   309,   318,   318,   321,   340,   340,   350,
-     350,   358,   370,   370,   372,   372,   374,   374,   376,   376,
-     379,   380,   381,   384,   385,   386,   406,   406,   406,   416,
-     417,   417,   426,   432,   435,   436,   437,   438,   439,   440,
-     441,   442,   443,   444,   445,   446,   447,   448,   449,   450,
-     455,   456,   457,   464,   465,   473,   474,   474,   480,   480,
-     489,   488,   520,   521,   524,   524,   527,   530,   531,   534,
-     535,   535,   539,   540,   543,   548,   555,   556,   559,   564,
-     571,   572,   575,   576,   583,   583,   589,   590,   593,   594,
-     602,   608,   615,   625,   625,   629,   629,   637,   638,   645,
-     646,   649
+       0,   256,   256,   258,   257,   266,   267,   272,   277,   271,
+     292,   297,   291,   313,   314,   317,   317,   326,   326,   329,
+     348,   348,   358,   358,   366,   378,   378,   380,   380,   382,
+     382,   384,   384,   387,   388,   389,   392,   393,   394,   414,
+     414,   414,   424,   425,   425,   434,   440,   443,   444,   445,
+     446,   447,   448,   449,   450,   451,   452,   453,   454,   455,
+     456,   457,   458,   463,   464,   465,   472,   473,   481,   482,
+     482,   488,   488,   497,   496,   528,   529,   532,   532,   535,
+     536,   539,   540,   543,   544,   544,   548,   549,   552,   557,
+     564,   565,   568,   573,   580,   581,   584,   585,   592,   592,
+     598,   599,   602,   603,   611,   617,   624,   634,   634,   638,
+     638,   646,   647,   654,   655,   658
 };
 #endif
 
@@ -937,14 +951,15 @@ static const char *const yytname[] =
   "ADDEQ", "SUBEQ", "MULTEQ", "DIVEQ", "AND", "OR", "'='", "NE", "'>'",
   "'<'", "LE", "GE", "CONC", "'+'", "'-'", "'*'", "'/'", "UNARY", "NOT",
   "'('", "')'", "';'", "'@'", "','", "'{'", "'}'", "'['", "']'", "'.'",
-  "$accept", "functionlist", "$@1", "function", "@2", "$@3", "statlist",
-  "stat", "$@4", "sc", "stat1", "@5", "@6", "$@7", "$@8", "$@9", "$@10",
-  "elsepart", "block", "@11", "$@12", "ret", "$@13", "PrepJump", "expr1",
-  "expr", "$@14", "$@15", "typeconstructor", "@16", "dimension",
-  "functioncall", "@17", "functionvalue", "exprlist", "exprlist1", "$@18",
-  "parlist", "parlist1", "objectname", "fieldlist", "ffieldlist",
-  "ffieldlist1", "ffield", "@19", "lfieldlist", "lfieldlist1", "varlist1",
-  "var", "$@20", "$@21", "localdeclist", "decinit", "setdebug", YY_NULLPTR
+  "$accept", "functionlist", "$@1", "function", "@2", "$@3",
+  "anonymous_function", "@4", "$@5", "statlist", "stat", "$@6", "sc",
+  "stat1", "@7", "@8", "$@9", "$@10", "$@11", "$@12", "elsepart", "block",
+  "@13", "$@14", "ret", "$@15", "PrepJump", "expr1", "expr", "$@16",
+  "$@17", "typeconstructor", "@18", "dimension", "functioncall", "@19",
+  "functionvalue", "exprlist", "exprlist1", "$@20", "parlist", "parlist1",
+  "objectname", "fieldlist", "ffieldlist", "ffieldlist1", "ffield", "@21",
+  "lfieldlist", "lfieldlist1", "varlist1", "var", "$@22", "$@23",
+  "localdeclist", "decinit", "setdebug", YY_NULLPTR
 };
 
 static const char *
@@ -954,12 +969,12 @@ yysymbol_name (yysymbol_kind_t yysymbol)
 }
 #endif
 
-#define YYPACT_NINF (-139)
+#define YYPACT_NINF (-142)
 
 #define yypact_value_is_default(Yyn) \
   ((Yyn) == YYPACT_NINF)
 
-#define YYTABLE_NINF (-106)
+#define YYTABLE_NINF (-110)
 
 #define yytable_value_is_error(Yyn) \
   0
@@ -968,25 +983,26 @@ yysymbol_name (yysymbol_kind_t yysymbol)
    STATE-NUM.  */
 static const yytype_int16 yypact[] =
 {
-    -139,     7,  -139,     1,  -139,  -139,  -139,  -139,  -139,     4,
-       0,     2,  -139,  -139,    31,  -139,  -139,     9,  -139,  -139,
-    -139,  -139,  -139,  -139,   -21,   102,    32,  -139,  -139,  -139,
-      31,    31,    31,    31,    24,    82,  -139,  -139,  -139,   -18,
-      31,  -139,  -139,   -19,    48,    40,    31,    53,  -139,  -139,
-    -139,  -139,    34,    33,  -139,    43,    42,  -139,  -139,  -139,
-     149,    59,    31,  -139,  -139,  -139,    31,    31,    31,    31,
-      31,    31,    31,    31,    31,    31,    31,   163,    90,  -139,
-      31,    84,  -139,  -139,   -35,    31,   200,    61,   -17,    31,
-      31,    31,    31,    31,   101,  -139,   108,  -139,   149,    87,
-    -139,  -139,  -139,   181,   181,   181,   181,   181,   181,   185,
-       8,     8,  -139,  -139,  -139,    31,   131,    61,  -139,   110,
-      31,  -139,    91,    61,  -139,   149,   149,   149,   149,   176,
-    -139,  -139,  -139,  -139,  -139,    31,    31,  -139,   149,     4,
-     117,  -139,    88,    92,  -139,   149,    98,    96,  -139,    31,
-    -139,   122,    29,    62,    62,  -139,  -139,  -139,  -139,   133,
-     121,  -139,   110,  -139,    31,   200,  -139,  -139,    31,   139,
-     140,    31,    31,  -139,   149,  -139,   135,  -139,  -139,     4,
-     149,  -139,  -139,  -139,  -139,    29,  -139
+    -142,     6,  -142,    -3,  -142,  -142,  -142,  -142,  -142,   -33,
+       2,   -16,  -142,  -142,   112,  -142,  -142,    15,  -142,    21,
+    -142,  -142,  -142,  -142,  -142,  -142,   -19,    85,    24,  -142,
+    -142,  -142,   112,   112,   112,    80,    10,   142,  -142,  -142,
+    -142,   -35,   112,  -142,  -142,   -17,  -142,    35,    31,   112,
+      53,  -142,  -142,  -142,  -142,    27,    26,  -142,    37,    44,
+    -142,  -142,  -142,   207,    48,   112,  -142,  -142,  -142,   112,
+     112,   112,   112,   112,   112,   112,   112,   112,   112,   112,
+     170,    82,  -142,   112,    81,  -142,    61,  -142,   -10,   112,
+     220,    58,   -35,   112,   112,   112,   112,   112,    84,  -142,
+      91,  -142,   207,    71,  -142,  -142,  -142,    -4,    -4,    -4,
+      -4,    -4,    -4,    32,     4,     4,  -142,  -142,  -142,   112,
+      79,    58,  -142,    24,    94,   112,  -142,    76,    58,  -142,
+     207,   207,   207,   207,   183,  -142,  -142,  -142,  -142,  -142,
+     112,   112,  -142,   207,   -33,   104,    92,  -142,    75,    78,
+    -142,   207,    87,    93,  -142,   112,  -142,   123,    41,   231,
+     231,  -142,  -142,  -142,  -142,   124,  -142,   113,  -142,    94,
+    -142,   112,   220,  -142,  -142,   112,   126,   128,   112,  -142,
+     112,  -142,   207,  -142,   156,  -142,  -142,   -33,   130,   207,
+    -142,  -142,   103,  -142,  -142,  -142,    41,  -142
 };
 
 /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -994,47 +1010,48 @@ static const yytype_int16 yypact[] =
    means the default is an error.  */
 static const yytype_int8 yydefact[] =
 {
-       2,     3,     1,     0,   111,    12,     5,     6,     7,    14,
-       0,     0,    15,     4,     0,    17,    19,     0,   102,    70,
-      13,    31,    30,    74,     0,   100,    82,    63,    61,    62,
-       0,     0,     0,     0,    70,     0,    43,    58,    64,    60,
-       0,    36,   107,   109,    86,     0,     0,     0,    22,    24,
-      26,    28,     0,     0,    84,     0,    83,    56,    57,    65,
-       0,    43,    72,    42,    42,    42,     0,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,     0,     0,     0,    10,
-       0,     0,    32,    87,     0,    77,    79,    21,   101,     0,
-       0,     0,     0,     0,     0,     8,     0,    44,    73,     0,
-      36,    66,    68,    45,    48,    47,    46,    49,    50,    55,
-      51,    52,    53,    54,    42,     0,    12,   110,   108,    90,
-      96,    71,     0,    78,    80,    23,    25,    27,    29,     0,
-     106,    36,    85,    59,    42,     0,     0,    36,    42,    14,
-      39,    94,     0,    91,    92,    98,     0,    97,    75,     0,
-     104,     0,    33,    67,    69,    42,    20,    11,    38,     0,
-       0,    88,     0,    89,     0,    81,     9,    36,     0,     0,
-       0,    77,     0,    93,    99,    34,     0,    16,    18,    14,
-      95,    42,    41,    36,    42,    33,    35
+       2,     3,     1,     0,   115,    15,     5,     6,     7,    17,
+       0,     0,    18,     4,     0,    20,    22,     0,   106,     0,
+      73,    80,    16,    34,    33,    77,     0,   104,    86,    66,
+      64,    65,     0,     0,     0,     0,    73,     0,    46,    61,
+      67,    63,     0,    39,   111,   113,    10,    90,     0,     0,
+       0,    25,    27,    29,    31,     0,     0,    88,     0,    87,
+      59,    60,    68,     0,    46,    75,    45,    45,    45,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,    13,     0,     0,    35,     0,    91,     0,    81,
+      83,    24,   105,     0,     0,     0,     0,     0,     0,     8,
+       0,    47,    76,     0,    39,    69,    71,    48,    51,    50,
+      49,    52,    53,    58,    54,    55,    56,    57,    45,     0,
+      15,   114,   112,    86,    94,   100,    74,     0,    82,    84,
+      26,    28,    30,    32,     0,   110,    39,    89,    62,    45,
+       0,     0,    39,    45,    17,    42,     0,    98,     0,    95,
+      96,   102,     0,   101,    78,     0,   108,     0,    36,    70,
+      72,    45,    23,    14,    41,     0,    11,     0,    92,     0,
+      93,     0,    85,     9,    39,     0,     0,     0,    81,    39,
+       0,    97,   103,    37,     0,    19,    21,    17,     0,    99,
+      45,    44,     0,    39,    12,    45,    36,    38
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int16 yypgoto[] =
 {
-    -139,  -139,  -139,  -139,  -139,  -139,  -139,    39,  -139,  -138,
-    -139,  -139,  -139,  -139,  -139,  -139,  -139,   -29,   -98,  -139,
-    -139,  -139,  -139,   -51,   -14,   -12,  -139,  -139,   147,  -139,
-    -139,   177,  -139,  -139,    52,   -42,  -139,  -139,  -139,  -139,
-    -139,  -139,  -139,    76,  -139,  -139,  -139,  -139,    -7,  -139,
-    -139,  -139,  -139,  -139
+    -142,  -142,  -142,  -142,  -142,  -142,  -142,  -142,  -142,  -142,
+      25,  -142,  -141,  -142,  -142,  -142,  -142,  -142,  -142,  -142,
+     -47,   -89,  -142,  -142,  -142,  -142,   -66,   -14,   -13,  -142,
+    -142,   140,  -142,  -142,   143,  -142,  -142,   -24,   -44,  -142,
+      33,  -142,  -142,  -142,  -142,  -142,   -11,  -142,  -142,  -142,
+    -142,    -6,  -142,  -142,  -142,  -142,  -142
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_uint8 yydefgoto[] =
 {
-       0,     1,     5,     6,    11,   131,   116,     9,    10,    13,
-      20,    40,    41,    89,    90,    91,    92,   169,    78,    79,
-     140,   158,   159,   100,    60,    36,   135,   136,    37,    44,
-      99,    38,    45,    23,   122,   123,   149,    55,    56,    84,
-     121,   142,   143,   144,   160,   146,   147,    24,    39,    52,
-      53,    43,    82,     7
+       0,     1,     5,     6,    11,   136,    21,    86,   179,   120,
+       9,    10,    13,    22,    42,    43,    93,    94,    95,    96,
+     176,    81,    82,   145,   164,   165,   104,    63,    38,   140,
+     141,    39,    47,   103,    40,    48,    25,   127,   128,   155,
+      58,    59,    88,   126,   148,   149,   150,   167,   152,   153,
+      26,    41,    55,    56,    45,    85,     7
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
@@ -1042,117 +1059,124 @@ static const yytype_uint8 yydefgoto[] =
    number is the opposite.  If YYTABLE_NINF, syntax error.  */
 static const yytype_int16 yytable[] =
 {
-      35,   157,   134,    25,    87,    14,    46,     2,    80,    15,
-     119,    16,   120,   101,   102,    17,    57,    58,    59,    18,
-       8,    61,   -76,    47,     3,    81,    77,     4,    42,  -103,
-    -103,  -105,  -105,   151,    86,    27,   167,   168,   117,   155,
-      88,   182,    26,    19,    75,    76,    12,    28,    98,    29,
-      18,    54,   103,   104,   105,   106,   107,   108,   109,   110,
-     111,   112,   113,   137,    62,    30,    31,    83,    86,   175,
-      32,    33,    18,    86,    34,   125,   126,   127,   128,   129,
-      85,    93,    94,   152,    95,   184,    96,   156,    63,    66,
-      67,    68,    69,    70,    71,    72,    73,    74,    75,    76,
-      97,   138,   115,   118,   170,   124,   145,    64,    65,    66,
-      67,    68,    69,    70,    71,    72,    73,    74,    75,    76,
-     130,   153,   154,    48,    49,    50,    51,   132,   133,   141,
-     183,   -40,   148,   185,   161,   166,   162,   165,   -37,   -37,
-     164,   181,   -76,   -37,   -37,   -37,   163,   171,   172,  -103,
-     174,  -105,   177,   178,   176,   139,   186,    21,   180,    86,
-      64,    65,    66,    67,    68,    69,    70,    71,    72,    73,
-      74,    75,    76,   114,    64,    65,    66,    67,    68,    69,
-      70,    71,    72,    73,    74,    75,    76,    22,    64,    65,
-      66,    67,    68,    69,    70,    71,    72,    73,    74,    75,
-      76,    64,    65,    66,    67,    68,    69,    70,    71,    72,
-      73,    74,    75,    76,    72,    73,    74,    75,    76,    73,
-      74,    75,    76,   179,   150,   -43,   -43,   -43,   -43,   -43,
-     -43,   -43,   -43,   -43,   -43,   -43,   -43,   -43,   173
+      37,   105,   106,   163,    27,    91,     2,    14,    49,    12,
+      83,    15,  -107,    16,  -109,   139,     8,    17,    60,    61,
+      62,    18,    64,     3,    28,    50,     4,    84,    80,    75,
+      76,    77,    78,    79,    44,   124,    90,   125,    46,   121,
+      78,    79,    19,    57,    92,    20,   191,   157,   174,   175,
+      65,   102,   142,   161,    87,   107,   108,   109,   110,   111,
+     112,   113,   114,   115,   116,   117,    76,    77,    78,    79,
+      90,    89,    18,   158,    97,    98,    90,   162,    99,   130,
+     131,   132,   133,   134,    29,   183,   -40,   -40,   100,   101,
+     188,   -40,   -40,   -40,   119,   177,    30,    46,    31,    18,
+     122,   123,   129,   135,   195,   143,    51,    52,    53,    54,
+     137,   151,   138,   147,    32,    33,    29,   154,   -43,    34,
+      35,   168,   169,    36,   193,   -79,   159,   160,    30,   196,
+      31,    18,  -107,   166,  -109,   170,   173,   171,   178,   185,
+     180,   186,   172,   192,   194,   144,    32,    33,    66,   197,
+      23,    34,    35,    24,   187,    36,   146,   182,   181,     0,
+       0,   184,   190,     0,     0,    90,   189,    67,    68,    69,
+      70,    71,    72,    73,    74,    75,    76,    77,    78,    79,
+     118,    67,    68,    69,    70,    71,    72,    73,    74,    75,
+      76,    77,    78,    79,     0,    67,    68,    69,    70,    71,
+      72,    73,    74,    75,    76,    77,    78,    79,    67,    68,
+      69,    70,    71,    72,    73,    74,    75,    76,    77,    78,
+      79,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,   156,    67,    68,    69,    70,    71,    72,    73,    74,
+      75,    76,    77,    78,    79,   -46,   -46,   -46,   -46,   -46,
+     -46,   -46,   -46,   -46,   -46,   -46,   -46,   -46,    69,    70,
+      71,    72,    73,    74,    75,    76,    77,    78,    79
 };
 
-static const yytype_uint8 yycheck[] =
+static const yytype_int16 yycheck[] =
 {
-      14,   139,   100,    10,    46,     5,    27,     0,    27,     9,
-      45,    11,    47,    64,    65,    15,    30,    31,    32,    19,
-      19,    33,    40,    44,    17,    44,    40,    20,    19,    47,
-      47,    49,    49,   131,    46,     4,     7,     8,    80,   137,
-      47,   179,    40,    43,    36,    37,    42,    16,    62,    18,
-      19,    19,    66,    67,    68,    69,    70,    71,    72,    73,
-      74,    75,    76,   114,    40,    34,    35,    19,    80,   167,
-      39,    40,    19,    85,    43,    89,    90,    91,    92,    93,
-      40,    47,    49,   134,    41,   183,    44,   138,     6,    27,
+      14,    67,    68,   144,    10,    49,     0,     5,    27,    42,
+      27,     9,    47,    11,    49,   104,    19,    15,    32,    33,
+      34,    19,    35,    17,    40,    44,    20,    44,    42,    33,
+      34,    35,    36,    37,    19,    45,    49,    47,    17,    83,
+      36,    37,    40,    19,    50,    43,   187,   136,     7,     8,
+      40,    65,   118,   142,    19,    69,    70,    71,    72,    73,
+      74,    75,    76,    77,    78,    79,    34,    35,    36,    37,
+      83,    40,    19,   139,    47,    49,    89,   143,    41,    93,
+      94,    95,    96,    97,     4,   174,     7,     8,    44,    41,
+     179,    12,    13,    14,    12,   161,    16,    17,    18,    19,
+      19,    40,    44,    19,   193,   119,    21,    22,    23,    24,
+      19,   125,    41,    19,    34,    35,     4,    41,    14,    39,
+      40,    46,    44,    43,   190,    40,   140,   141,    16,   195,
+      18,    19,    47,    41,    49,    48,    13,    44,    14,    13,
+      27,    13,   155,    13,    41,   120,    34,    35,     6,   196,
+      10,    39,    40,    10,   178,    43,   123,   171,   169,    -1,
+      -1,   175,     6,    -1,    -1,   178,   180,    25,    26,    27,
       28,    29,    30,    31,    32,    33,    34,    35,    36,    37,
-      41,   115,    12,    19,   155,    44,   120,    25,    26,    27,
-      28,    29,    30,    31,    32,    33,    34,    35,    36,    37,
-      19,   135,   136,    21,    22,    23,    24,    19,    41,    19,
-     181,    14,    41,   184,    46,    13,    44,   149,     7,     8,
-      44,     6,    40,    12,    13,    14,    48,    14,    27,    47,
-     164,    49,    13,    13,   168,   116,   185,    10,   172,   171,
-      25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
-      35,    36,    37,    10,    25,    26,    27,    28,    29,    30,
-      31,    32,    33,    34,    35,    36,    37,    10,    25,    26,
+      10,    25,    26,    27,    28,    29,    30,    31,    32,    33,
+      34,    35,    36,    37,    -1,    25,    26,    27,    28,    29,
+      30,    31,    32,    33,    34,    35,    36,    37,    25,    26,
       27,    28,    29,    30,    31,    32,    33,    34,    35,    36,
-      37,    25,    26,    27,    28,    29,    30,    31,    32,    33,
-      34,    35,    36,    37,    33,    34,    35,    36,    37,    34,
-      35,    36,    37,   171,    48,    25,    26,    27,    28,    29,
-      30,    31,    32,    33,    34,    35,    36,    37,   162
+      37,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
+      -1,    48,    25,    26,    27,    28,    29,    30,    31,    32,
+      33,    34,    35,    36,    37,    25,    26,    27,    28,    29,
+      30,    31,    32,    33,    34,    35,    36,    37,    27,    28,
+      29,    30,    31,    32,    33,    34,    35,    36,    37
 };
 
 /* YYSTOS[STATE-NUM] -- The symbol kind of the accessing symbol of
    state STATE-NUM.  */
 static const yytype_int8 yystos[] =
 {
-       0,    51,     0,    17,    20,    52,    53,   103,    19,    57,
-      58,    54,    42,    59,     5,     9,    11,    15,    19,    43,
-      60,    78,    81,    83,    97,    98,    40,     4,    16,    18,
-      34,    35,    39,    40,    43,    74,    75,    78,    81,    98,
-      61,    62,    19,   101,    79,    82,    27,    44,    21,    22,
-      23,    24,    99,   100,    19,    87,    88,    74,    74,    74,
-      74,    75,    40,     6,    25,    26,    27,    28,    29,    30,
-      31,    32,    33,    34,    35,    36,    37,    74,    68,    69,
-      27,    44,   102,    19,    89,    40,    75,    85,    98,    63,
-      64,    65,    66,    47,    49,    41,    44,    41,    74,    80,
-      73,    73,    73,    74,    74,    74,    74,    74,    74,    74,
-      74,    74,    74,    74,    10,    12,    56,    85,    19,    45,
-      47,    90,    84,    85,    44,    74,    74,    74,    74,    74,
-      19,    55,    19,    41,    68,    76,    77,    73,    74,    57,
-      70,    19,    91,    92,    93,    74,    95,    96,    41,    86,
-      48,    68,    73,    74,    74,    68,    73,    59,    71,    72,
-      94,    46,    44,    48,    44,    75,    13,     7,     8,    67,
-      73,    14,    27,    93,    74,    68,    74,    13,    13,    84,
-      74,     6,    59,    73,    68,    73,    67
+       0,    51,     0,    17,    20,    52,    53,   106,    19,    60,
+      61,    54,    42,    62,     5,     9,    11,    15,    19,    40,
+      43,    56,    63,    81,    84,    86,   100,   101,    40,     4,
+      16,    18,    34,    35,    39,    40,    43,    77,    78,    81,
+      84,   101,    64,    65,    19,   104,    17,    82,    85,    27,
+      44,    21,    22,    23,    24,   102,   103,    19,    90,    91,
+      77,    77,    77,    77,    78,    40,     6,    25,    26,    27,
+      28,    29,    30,    31,    32,    33,    34,    35,    36,    37,
+      77,    71,    72,    27,    44,   105,    57,    19,    92,    40,
+      78,    88,   101,    66,    67,    68,    69,    47,    49,    41,
+      44,    41,    77,    83,    76,    76,    76,    77,    77,    77,
+      77,    77,    77,    77,    77,    77,    77,    77,    10,    12,
+      59,    88,    19,    40,    45,    47,    93,    87,    88,    44,
+      77,    77,    77,    77,    77,    19,    55,    19,    41,    71,
+      79,    80,    76,    77,    60,    73,    90,    19,    94,    95,
+      96,    77,    98,    99,    41,    89,    48,    71,    76,    77,
+      77,    71,    76,    62,    74,    75,    41,    97,    46,    44,
+      48,    44,    78,    13,     7,     8,    70,    76,    14,    58,
+      27,    96,    77,    71,    77,    13,    13,    87,    71,    77,
+       6,    62,    13,    76,    41,    71,    76,    70
 };
 
 /* YYR1[RULE-NUM] -- Symbol kind of the left-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr1[] =
 {
        0,    50,    51,    52,    51,    51,    51,    54,    55,    53,
-      56,    56,    58,    57,    59,    59,    60,    61,    60,    62,
-      60,    60,    63,    60,    64,    60,    65,    60,    66,    60,
-      60,    60,    60,    67,    67,    67,    69,    70,    68,    71,
-      72,    71,    73,    74,    75,    75,    75,    75,    75,    75,
-      75,    75,    75,    75,    75,    75,    75,    75,    75,    75,
-      75,    75,    75,    75,    75,    75,    76,    75,    77,    75,
-      79,    78,    80,    80,    82,    81,    83,    84,    84,    85,
-      86,    85,    87,    87,    88,    88,    89,    89,    90,    90,
-      91,    91,    92,    92,    94,    93,    95,    95,    96,    96,
-      97,    97,    98,    99,    98,   100,    98,   101,   101,   102,
-     102,   103
+      57,    58,    56,    59,    59,    61,    60,    62,    62,    63,
+      64,    63,    65,    63,    63,    66,    63,    67,    63,    68,
+      63,    69,    63,    63,    63,    63,    70,    70,    70,    72,
+      73,    71,    74,    75,    74,    76,    77,    78,    78,    78,
+      78,    78,    78,    78,    78,    78,    78,    78,    78,    78,
+      78,    78,    78,    78,    78,    78,    78,    78,    78,    79,
+      78,    80,    78,    82,    81,    83,    83,    85,    84,    86,
+      86,    87,    87,    88,    89,    88,    90,    90,    91,    91,
+      92,    92,    93,    93,    94,    94,    95,    95,    97,    96,
+      98,    98,    99,    99,   100,   100,   101,   102,   101,   103,
+     101,   104,   104,   105,   105,   106
 };
 
 /* YYR2[RULE-NUM] -- Number of symbols on the right-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr2[] =
 {
        0,     2,     0,     0,     4,     2,     2,     0,     0,     9,
-       0,     3,     0,     2,     0,     1,     8,     0,     8,     0,
-       6,     3,     0,     4,     0,     4,     0,     4,     0,     4,
-       1,     1,     3,     0,     2,     7,     0,     0,     4,     0,
-       0,     4,     0,     1,     3,     3,     3,     3,     3,     3,
-       3,     3,     3,     3,     3,     3,     2,     2,     1,     4,
-       1,     1,     1,     1,     1,     2,     0,     5,     0,     5,
-       0,     4,     0,     1,     0,     5,     1,     0,     1,     1,
-       0,     4,     0,     1,     1,     3,     0,     1,     3,     3,
-       0,     1,     1,     3,     0,     4,     0,     1,     1,     3,
-       1,     3,     1,     0,     5,     0,     4,     1,     3,     0,
-       2,     1
+       0,     0,    10,     0,     3,     0,     2,     0,     1,     8,
+       0,     8,     0,     6,     3,     0,     4,     0,     4,     0,
+       4,     0,     4,     1,     1,     3,     0,     2,     7,     0,
+       0,     4,     0,     0,     4,     0,     1,     3,     3,     3,
+       3,     3,     3,     3,     3,     3,     3,     3,     3,     2,
+       2,     1,     4,     1,     1,     1,     1,     1,     2,     0,
+       5,     0,     5,     0,     4,     0,     1,     0,     5,     1,
+       1,     0,     1,     1,     0,     4,     0,     1,     1,     3,
+       0,     1,     3,     3,     0,     1,     1,     3,     0,     4,
+       0,     1,     1,     3,     1,     3,     1,     0,     5,     0,
+       4,     1,     3,     0,     2,     1
 };
 
 
@@ -1616,79 +1640,83 @@ yyreduce:
   switch (yyn)
     {
   case 3: /* $@1: %empty  */
-#line 247 "lua.stx"
+#line 258 "lua.stx"
                 {
 	  	  pc=maincode; basepc=initcode; maxcurr=maxmain;
 		  nlocalvar=0;
 	        }
-#line 1626 "y.tab.c"
+#line 1650 "y.tab.c"
     break;
 
   case 4: /* functionlist: functionlist $@1 stat sc  */
-#line 252 "lua.stx"
+#line 263 "lua.stx"
                 {
 		  maincode=pc; initcode=basepc; maxmain=maxcurr;
 		}
-#line 1634 "y.tab.c"
+#line 1658 "y.tab.c"
     break;
 
   case 7: /* @2: %empty  */
-#line 260 "lua.stx"
+#line 272 "lua.stx"
                {
-		if (code == NULL)	/* first function */
-		{
-		 code = (Byte *) calloc(GAPCODE, sizeof(Byte));
-		 if (code == NULL)
-		 {
-		  lua_error("not enough memory");
-		  err = 1;
-		 }
-		 maxcode = GAPCODE;
-		}
-		pc=0; basepc=code; maxcurr=maxcode; 
-		nlocalvar=0;
-		(yyval.vWord) = lua_findsymbol((yyvsp[0].pChar)); 
+                (yyval.vWord) = lua_findsymbol((yyvsp[0].pChar)); 
+                lua_begin_scope((yyval.vWord));
 	       }
-#line 1654 "y.tab.c"
+#line 1667 "y.tab.c"
     break;
 
   case 8: /* $@3: %empty  */
-#line 276 "lua.stx"
-               {
-	        if (lua_debug)
-		{
-	         code_byte(SETFUNCTION); 
-                 code_word(lua_nfile-1);
-		 code_word((yyvsp[-3].vWord));
-		}
-	        lua_codeadjust (0);
-	       }
-#line 1668 "y.tab.c"
+#line 277 "lua.stx"
+           { 
+                lua_codeadjust(0); 
+            }
+#line 1675 "y.tab.c"
     break;
 
   case 9: /* function: FUNCTION NAME @2 '(' parlist ')' $@3 block END  */
-#line 287 "lua.stx"
-               { 
-                if (lua_debug) code_byte(RESET); 
-	        code_byte(RETCODE); code_byte(nlocalvar);
-	        s_tag((yyvsp[-6].vWord)) = T_FUNCTION;
-	        s_bvalue((yyvsp[-6].vWord)) = calloc (pc, sizeof(Byte));
-		if (s_bvalue((yyvsp[-6].vWord)) == NULL)
-		{
-		 lua_error("not enough memory");
-		 err = 1;
-		}
-	        memcpy (s_bvalue((yyvsp[-6].vWord)), basepc, pc*sizeof(Byte));
-		code = basepc; maxcode=maxcurr;
+#line 282 "lua.stx"
+               {
+            lua_end_scope((yyvsp[-6].vWord));
 #if LISTING
 PrintCode(code,code+pc);
 #endif
 	       }
-#line 1689 "y.tab.c"
+#line 1686 "y.tab.c"
     break;
 
-  case 12: /* $@4: %empty  */
-#line 309 "lua.stx"
+  case 10: /* @4: %empty  */
+#line 292 "lua.stx"
+            {
+                (yyval.vWord) = lua_findsymbol("__ANONYMOUS_FUN"); 
+                lua_begin_scope((yyval.vWord));
+            }
+#line 1695 "y.tab.c"
+    break;
+
+  case 11: /* $@5: %empty  */
+#line 297 "lua.stx"
+            { 
+                lua_codeadjust(0); 
+            }
+#line 1703 "y.tab.c"
+    break;
+
+  case 12: /* anonymous_function: '(' FUNCTION @4 '(' parlist ')' $@5 block END ')'  */
+#line 302 "lua.stx"
+               { 
+                lua_end_scope((yyvsp[-7].vWord)); 
+                // 定义完立刻压栈，供 functioncall 使用
+                lua_pushvar((yyvsp[-7].vWord)+1);
+
+#if LISTING
+PrintCode(code,code+pc);
+#endif
+	       }
+#line 1717 "y.tab.c"
+    break;
+
+  case 15: /* $@6: %empty  */
+#line 317 "lua.stx"
            {
             ntemp = 0; 
             if (lua_debug)
@@ -1696,11 +1724,11 @@ PrintCode(code,code+pc);
              code_byte(SETLINE); code_word(lua_linenumber);
             }
 	   }
-#line 1701 "y.tab.c"
+#line 1729 "y.tab.c"
     break;
 
-  case 16: /* stat1: IF expr1 THEN PrepJump block PrepJump elsepart END  */
-#line 322 "lua.stx"
+  case 19: /* stat1: IF expr1 THEN PrepJump block PrepJump elsepart END  */
+#line 330 "lua.stx"
        {
         {
 	 Word elseinit = (yyvsp[-2].vWord)+sizeof(Word)+1;
@@ -1718,17 +1746,17 @@ PrintCode(code,code+pc);
 	 code_word_at(basepc+(yyvsp[-4].vWord)+1,elseinit-((yyvsp[-4].vWord)+sizeof(Word)+1));
 	}
        }
-#line 1723 "y.tab.c"
+#line 1751 "y.tab.c"
     break;
 
-  case 17: /* @5: %empty  */
-#line 340 "lua.stx"
+  case 20: /* @7: %empty  */
+#line 348 "lua.stx"
                {(yyval.vWord)=pc;}
-#line 1729 "y.tab.c"
+#line 1757 "y.tab.c"
     break;
 
-  case 18: /* stat1: WHILE @5 expr1 DO PrepJump block PrepJump END  */
-#line 342 "lua.stx"
+  case 21: /* stat1: WHILE @7 expr1 DO PrepJump block PrepJump END  */
+#line 350 "lua.stx"
        {
         basepc[(yyvsp[-3].vWord)] = IFFJMP;
 	code_word_at(basepc+(yyvsp[-3].vWord)+1, pc - ((yyvsp[-3].vWord) + sizeof(Word)+1));
@@ -1736,26 +1764,26 @@ PrintCode(code,code+pc);
         basepc[(yyvsp[-1].vWord)] = UPJMP;
 	code_word_at(basepc+(yyvsp[-1].vWord)+1, pc - ((yyvsp[-6].vWord)));
        }
-#line 1741 "y.tab.c"
+#line 1769 "y.tab.c"
     break;
 
-  case 19: /* @6: %empty  */
-#line 350 "lua.stx"
+  case 22: /* @8: %empty  */
+#line 358 "lua.stx"
                 {(yyval.vWord)=pc;}
-#line 1747 "y.tab.c"
+#line 1775 "y.tab.c"
     break;
 
-  case 20: /* stat1: REPEAT @6 block UNTIL expr1 PrepJump  */
-#line 352 "lua.stx"
+  case 23: /* stat1: REPEAT @8 block UNTIL expr1 PrepJump  */
+#line 360 "lua.stx"
        {
         basepc[(yyvsp[0].vWord)] = IFFUPJMP;
 	code_word_at(basepc+(yyvsp[0].vWord)+1, pc - ((yyvsp[-4].vWord)));
        }
-#line 1756 "y.tab.c"
+#line 1784 "y.tab.c"
     break;
 
-  case 21: /* stat1: varlist1 '=' exprlist1  */
-#line 359 "lua.stx"
+  case 24: /* stat1: varlist1 '=' exprlist1  */
+#line 367 "lua.stx"
        {
         {
          int i;
@@ -1767,77 +1795,77 @@ PrintCode(code,code+pc);
 	  lua_codeadjust (0);
 	}
        }
-#line 1772 "y.tab.c"
+#line 1800 "y.tab.c"
     break;
 
-  case 22: /* $@7: %empty  */
-#line 370 "lua.stx"
+  case 25: /* $@9: %empty  */
+#line 378 "lua.stx"
                    { lua_pushvar((yyvsp[-1].vLong)); }
-#line 1778 "y.tab.c"
+#line 1806 "y.tab.c"
     break;
 
-  case 23: /* stat1: var ADDEQ $@7 expr1  */
-#line 371 "lua.stx"
-        { code_compound_finish((yyvsp[-3].vLong), ADDOP); ntemp--; }
-#line 1784 "y.tab.c"
-    break;
-
-  case 24: /* $@8: %empty  */
-#line 372 "lua.stx"
-                   { lua_pushvar((yyvsp[-1].vLong)); }
-#line 1790 "y.tab.c"
-    break;
-
-  case 25: /* stat1: var SUBEQ $@8 expr1  */
-#line 373 "lua.stx"
-        { code_compound_finish((yyvsp[-3].vLong), SUBOP); ntemp--; }
-#line 1796 "y.tab.c"
-    break;
-
-  case 26: /* $@9: %empty  */
-#line 374 "lua.stx"
-                    { lua_pushvar((yyvsp[-1].vLong)); }
-#line 1802 "y.tab.c"
-    break;
-
-  case 27: /* stat1: var MULTEQ $@9 expr1  */
-#line 375 "lua.stx"
-        { code_compound_finish((yyvsp[-3].vLong), MULTOP); ntemp--; }
-#line 1808 "y.tab.c"
-    break;
-
-  case 28: /* $@10: %empty  */
-#line 376 "lua.stx"
-                   { lua_pushvar((yyvsp[-1].vLong)); }
-#line 1814 "y.tab.c"
-    break;
-
-  case 29: /* stat1: var DIVEQ $@10 expr1  */
-#line 377 "lua.stx"
-        { code_compound_finish((yyvsp[-3].vLong), DIVOP); ntemp--; }
-#line 1820 "y.tab.c"
-    break;
-
-  case 30: /* stat1: functioncall  */
+  case 26: /* stat1: var ADDEQ $@9 expr1  */
 #line 379 "lua.stx"
-                                        { lua_codeadjust (0); }
-#line 1826 "y.tab.c"
+        { code_compound_finish((yyvsp[-3].vLong), ADDOP); ntemp--; }
+#line 1812 "y.tab.c"
     break;
 
-  case 31: /* stat1: typeconstructor  */
+  case 27: /* $@10: %empty  */
 #line 380 "lua.stx"
-                                        { lua_codeadjust (0); }
-#line 1832 "y.tab.c"
+                   { lua_pushvar((yyvsp[-1].vLong)); }
+#line 1818 "y.tab.c"
     break;
 
-  case 32: /* stat1: LOCAL localdeclist decinit  */
+  case 28: /* stat1: var SUBEQ $@10 expr1  */
 #line 381 "lua.stx"
-                                      { add_nlocalvar((yyvsp[-1].vInt)); lua_codeadjust (0); }
-#line 1838 "y.tab.c"
+        { code_compound_finish((yyvsp[-3].vLong), SUBOP); ntemp--; }
+#line 1824 "y.tab.c"
     break;
 
-  case 35: /* elsepart: ELSEIF expr1 THEN PrepJump block PrepJump elsepart  */
+  case 29: /* $@11: %empty  */
+#line 382 "lua.stx"
+                    { lua_pushvar((yyvsp[-1].vLong)); }
+#line 1830 "y.tab.c"
+    break;
+
+  case 30: /* stat1: var MULTEQ $@11 expr1  */
+#line 383 "lua.stx"
+        { code_compound_finish((yyvsp[-3].vLong), MULTOP); ntemp--; }
+#line 1836 "y.tab.c"
+    break;
+
+  case 31: /* $@12: %empty  */
+#line 384 "lua.stx"
+                   { lua_pushvar((yyvsp[-1].vLong)); }
+#line 1842 "y.tab.c"
+    break;
+
+  case 32: /* stat1: var DIVEQ $@12 expr1  */
+#line 385 "lua.stx"
+        { code_compound_finish((yyvsp[-3].vLong), DIVOP); ntemp--; }
+#line 1848 "y.tab.c"
+    break;
+
+  case 33: /* stat1: functioncall  */
 #line 387 "lua.stx"
+                                        { lua_codeadjust (0); }
+#line 1854 "y.tab.c"
+    break;
+
+  case 34: /* stat1: typeconstructor  */
+#line 388 "lua.stx"
+                                        { lua_codeadjust (0); }
+#line 1860 "y.tab.c"
+    break;
+
+  case 35: /* stat1: LOCAL localdeclist decinit  */
+#line 389 "lua.stx"
+                                      { add_nlocalvar((yyvsp[-1].vInt)); lua_codeadjust (0); }
+#line 1866 "y.tab.c"
+    break;
+
+  case 38: /* elsepart: ELSEIF expr1 THEN PrepJump block PrepJump elsepart  */
+#line 395 "lua.stx"
          {
           {
   	   Word elseinit = (yyvsp[-1].vWord)+sizeof(Word)+1;
@@ -1855,23 +1883,23 @@ PrintCode(code,code+pc);
 	   code_word_at(basepc+(yyvsp[-3].vWord)+1, elseinit - ((yyvsp[-3].vWord) + sizeof(Word)+1));
 	  }  
          }
-#line 1860 "y.tab.c"
+#line 1888 "y.tab.c"
     break;
 
-  case 36: /* @11: %empty  */
-#line 406 "lua.stx"
+  case 39: /* @13: %empty  */
+#line 414 "lua.stx"
            {(yyval.vInt) = nlocalvar;}
-#line 1866 "y.tab.c"
+#line 1894 "y.tab.c"
     break;
 
-  case 37: /* $@12: %empty  */
-#line 406 "lua.stx"
+  case 40: /* $@14: %empty  */
+#line 414 "lua.stx"
                                             {ntemp = 0;}
-#line 1872 "y.tab.c"
+#line 1900 "y.tab.c"
     break;
 
-  case 38: /* block: @11 statlist $@12 ret  */
-#line 407 "lua.stx"
+  case 41: /* block: @13 statlist $@14 ret  */
+#line 415 "lua.stx"
          {
 	  if (nlocalvar != (yyvsp[-3].vInt))
 	  {
@@ -1879,170 +1907,170 @@ PrintCode(code,code+pc);
 	   lua_codeadjust (0);
 	  }
          }
-#line 1884 "y.tab.c"
+#line 1912 "y.tab.c"
     break;
 
-  case 40: /* $@13: %empty  */
-#line 417 "lua.stx"
+  case 43: /* $@15: %empty  */
+#line 425 "lua.stx"
           { if (lua_debug){code_byte(SETLINE);code_word(lua_linenumber);}}
-#line 1890 "y.tab.c"
+#line 1918 "y.tab.c"
     break;
 
-  case 41: /* ret: $@13 RETURN exprlist sc  */
-#line 419 "lua.stx"
+  case 44: /* ret: $@15 RETURN exprlist sc  */
+#line 427 "lua.stx"
           { 
            if (lua_debug) code_byte(RESET); 
            code_byte(RETCODE); code_byte(nlocalvar);
           }
-#line 1899 "y.tab.c"
+#line 1927 "y.tab.c"
     break;
 
-  case 42: /* PrepJump: %empty  */
-#line 426 "lua.stx"
+  case 45: /* PrepJump: %empty  */
+#line 434 "lua.stx"
          { 
 	  (yyval.vWord) = pc;
 	  code_byte(0);		/* open space */
 	  code_word (0);
          }
-#line 1909 "y.tab.c"
+#line 1937 "y.tab.c"
     break;
 
-  case 43: /* expr1: expr  */
-#line 432 "lua.stx"
-                { if ((yyvsp[0].vInt) == 0) {lua_codeadjust (ntemp+1); incr_ntemp();}}
-#line 1915 "y.tab.c"
-    break;
-
-  case 44: /* expr: '(' expr ')'  */
-#line 435 "lua.stx"
-                        { (yyval.vInt) = (yyvsp[-1].vInt); }
-#line 1921 "y.tab.c"
-    break;
-
-  case 45: /* expr: expr1 '=' expr1  */
-#line 436 "lua.stx"
-                        { code_byte(EQOP);   (yyval.vInt) = 1; ntemp--;}
-#line 1927 "y.tab.c"
-    break;
-
-  case 46: /* expr: expr1 '<' expr1  */
-#line 437 "lua.stx"
-                        { code_byte(LTOP);   (yyval.vInt) = 1; ntemp--;}
-#line 1933 "y.tab.c"
-    break;
-
-  case 47: /* expr: expr1 '>' expr1  */
-#line 438 "lua.stx"
-                        { code_byte(LEOP); code_byte(NOTOP); (yyval.vInt) = 1; ntemp--;}
-#line 1939 "y.tab.c"
-    break;
-
-  case 48: /* expr: expr1 NE expr1  */
-#line 439 "lua.stx"
-                        { code_byte(EQOP); code_byte(NOTOP); (yyval.vInt) = 1; ntemp--;}
-#line 1945 "y.tab.c"
-    break;
-
-  case 49: /* expr: expr1 LE expr1  */
+  case 46: /* expr1: expr  */
 #line 440 "lua.stx"
-                        { code_byte(LEOP);   (yyval.vInt) = 1; ntemp--;}
-#line 1951 "y.tab.c"
+                { if ((yyvsp[0].vInt) == 0) {lua_codeadjust (ntemp+1); incr_ntemp();}}
+#line 1943 "y.tab.c"
     break;
 
-  case 50: /* expr: expr1 GE expr1  */
-#line 441 "lua.stx"
-                        { code_byte(LTOP); code_byte(NOTOP); (yyval.vInt) = 1; ntemp--;}
-#line 1957 "y.tab.c"
-    break;
-
-  case 51: /* expr: expr1 '+' expr1  */
-#line 442 "lua.stx"
-                        { code_byte(ADDOP);  (yyval.vInt) = 1; ntemp--;}
-#line 1963 "y.tab.c"
-    break;
-
-  case 52: /* expr: expr1 '-' expr1  */
+  case 47: /* expr: '(' expr ')'  */
 #line 443 "lua.stx"
-                        { code_byte(SUBOP);  (yyval.vInt) = 1; ntemp--;}
-#line 1969 "y.tab.c"
+                        { (yyval.vInt) = (yyvsp[-1].vInt); }
+#line 1949 "y.tab.c"
     break;
 
-  case 53: /* expr: expr1 '*' expr1  */
+  case 48: /* expr: expr1 '=' expr1  */
 #line 444 "lua.stx"
-                        { code_byte(MULTOP); (yyval.vInt) = 1; ntemp--;}
-#line 1975 "y.tab.c"
+                        { code_byte(EQOP);   (yyval.vInt) = 1; ntemp--;}
+#line 1955 "y.tab.c"
     break;
 
-  case 54: /* expr: expr1 '/' expr1  */
+  case 49: /* expr: expr1 '<' expr1  */
 #line 445 "lua.stx"
-                        { code_byte(DIVOP);  (yyval.vInt) = 1; ntemp--;}
-#line 1981 "y.tab.c"
+                        { code_byte(LTOP);   (yyval.vInt) = 1; ntemp--;}
+#line 1961 "y.tab.c"
     break;
 
-  case 55: /* expr: expr1 CONC expr1  */
+  case 50: /* expr: expr1 '>' expr1  */
 #line 446 "lua.stx"
-                         { code_byte(CONCOP);  (yyval.vInt) = 1; ntemp--;}
-#line 1987 "y.tab.c"
+                        { code_byte(LEOP); code_byte(NOTOP); (yyval.vInt) = 1; ntemp--;}
+#line 1967 "y.tab.c"
     break;
 
-  case 56: /* expr: '+' expr1  */
+  case 51: /* expr: expr1 NE expr1  */
 #line 447 "lua.stx"
-                                { (yyval.vInt) = 1; }
-#line 1993 "y.tab.c"
+                        { code_byte(EQOP); code_byte(NOTOP); (yyval.vInt) = 1; ntemp--;}
+#line 1973 "y.tab.c"
     break;
 
-  case 57: /* expr: '-' expr1  */
+  case 52: /* expr: expr1 LE expr1  */
 #line 448 "lua.stx"
-                                { code_byte(MINUSOP); (yyval.vInt) = 1;}
-#line 1999 "y.tab.c"
+                        { code_byte(LEOP);   (yyval.vInt) = 1; ntemp--;}
+#line 1979 "y.tab.c"
     break;
 
-  case 58: /* expr: typeconstructor  */
+  case 53: /* expr: expr1 GE expr1  */
 #line 449 "lua.stx"
-                       { (yyval.vInt) = (yyvsp[0].vInt); }
-#line 2005 "y.tab.c"
+                        { code_byte(LTOP); code_byte(NOTOP); (yyval.vInt) = 1; ntemp--;}
+#line 1985 "y.tab.c"
     break;
 
-  case 59: /* expr: '@' '(' dimension ')'  */
+  case 54: /* expr: expr1 '+' expr1  */
+#line 450 "lua.stx"
+                        { code_byte(ADDOP);  (yyval.vInt) = 1; ntemp--;}
+#line 1991 "y.tab.c"
+    break;
+
+  case 55: /* expr: expr1 '-' expr1  */
 #line 451 "lua.stx"
+                        { code_byte(SUBOP);  (yyval.vInt) = 1; ntemp--;}
+#line 1997 "y.tab.c"
+    break;
+
+  case 56: /* expr: expr1 '*' expr1  */
+#line 452 "lua.stx"
+                        { code_byte(MULTOP); (yyval.vInt) = 1; ntemp--;}
+#line 2003 "y.tab.c"
+    break;
+
+  case 57: /* expr: expr1 '/' expr1  */
+#line 453 "lua.stx"
+                        { code_byte(DIVOP);  (yyval.vInt) = 1; ntemp--;}
+#line 2009 "y.tab.c"
+    break;
+
+  case 58: /* expr: expr1 CONC expr1  */
+#line 454 "lua.stx"
+                         { code_byte(CONCOP);  (yyval.vInt) = 1; ntemp--;}
+#line 2015 "y.tab.c"
+    break;
+
+  case 59: /* expr: '+' expr1  */
+#line 455 "lua.stx"
+                                { (yyval.vInt) = 1; }
+#line 2021 "y.tab.c"
+    break;
+
+  case 60: /* expr: '-' expr1  */
+#line 456 "lua.stx"
+                                { code_byte(MINUSOP); (yyval.vInt) = 1;}
+#line 2027 "y.tab.c"
+    break;
+
+  case 61: /* expr: typeconstructor  */
+#line 457 "lua.stx"
+                       { (yyval.vInt) = (yyvsp[0].vInt); }
+#line 2033 "y.tab.c"
+    break;
+
+  case 62: /* expr: '@' '(' dimension ')'  */
+#line 459 "lua.stx"
      { 
       code_byte(CREATEARRAY);
       (yyval.vInt) = 1;
      }
-#line 2014 "y.tab.c"
+#line 2042 "y.tab.c"
     break;
 
-  case 60: /* expr: var  */
-#line 455 "lua.stx"
+  case 63: /* expr: var  */
+#line 463 "lua.stx"
                         { lua_pushvar ((yyvsp[0].vLong)); (yyval.vInt) = 1;}
-#line 2020 "y.tab.c"
+#line 2048 "y.tab.c"
     break;
 
-  case 61: /* expr: NUMBER  */
-#line 456 "lua.stx"
+  case 64: /* expr: NUMBER  */
+#line 464 "lua.stx"
                         { code_number((yyvsp[0].vFloat)); (yyval.vInt) = 1; }
-#line 2026 "y.tab.c"
+#line 2054 "y.tab.c"
     break;
 
-  case 62: /* expr: STRING  */
-#line 458 "lua.stx"
+  case 65: /* expr: STRING  */
+#line 466 "lua.stx"
      {
       code_byte(PUSHSTRING);
       code_word((yyvsp[0].vWord));
       (yyval.vInt) = 1;
       incr_ntemp();
      }
-#line 2037 "y.tab.c"
+#line 2065 "y.tab.c"
     break;
 
-  case 63: /* expr: NIL  */
-#line 464 "lua.stx"
+  case 66: /* expr: NIL  */
+#line 472 "lua.stx"
                         {code_byte(PUSHNIL); (yyval.vInt) = 1; incr_ntemp();}
-#line 2043 "y.tab.c"
+#line 2071 "y.tab.c"
     break;
 
-  case 64: /* expr: functioncall  */
-#line 466 "lua.stx"
+  case 67: /* expr: functioncall  */
+#line 474 "lua.stx"
      {
       (yyval.vInt) = 0;
       if (lua_debug)
@@ -2050,60 +2078,60 @@ PrintCode(code,code+pc);
        code_byte(SETLINE); code_word(lua_linenumber);
       }
      }
-#line 2055 "y.tab.c"
+#line 2083 "y.tab.c"
     break;
 
-  case 65: /* expr: NOT expr1  */
-#line 473 "lua.stx"
+  case 68: /* expr: NOT expr1  */
+#line 481 "lua.stx"
                         { code_byte(NOTOP);  (yyval.vInt) = 1;}
-#line 2061 "y.tab.c"
+#line 2089 "y.tab.c"
     break;
 
-  case 66: /* $@14: %empty  */
-#line 474 "lua.stx"
+  case 69: /* $@16: %empty  */
+#line 482 "lua.stx"
                            {code_byte(POP); ntemp--;}
-#line 2067 "y.tab.c"
+#line 2095 "y.tab.c"
     break;
 
-  case 67: /* expr: expr1 AND PrepJump $@14 expr1  */
-#line 475 "lua.stx"
+  case 70: /* expr: expr1 AND PrepJump $@16 expr1  */
+#line 483 "lua.stx"
      { 
       basepc[(yyvsp[-2].vWord)] = ONFJMP;
       code_word_at(basepc+(yyvsp[-2].vWord)+1, pc - ((yyvsp[-2].vWord) + sizeof(Word)+1));
       (yyval.vInt) = 1;
      }
-#line 2077 "y.tab.c"
+#line 2105 "y.tab.c"
     break;
 
-  case 68: /* $@15: %empty  */
-#line 480 "lua.stx"
+  case 71: /* $@17: %empty  */
+#line 488 "lua.stx"
                           {code_byte(POP); ntemp--;}
-#line 2083 "y.tab.c"
+#line 2111 "y.tab.c"
     break;
 
-  case 69: /* expr: expr1 OR PrepJump $@15 expr1  */
-#line 481 "lua.stx"
+  case 72: /* expr: expr1 OR PrepJump $@17 expr1  */
+#line 489 "lua.stx"
      { 
       basepc[(yyvsp[-2].vWord)] = ONTJMP;
       code_word_at(basepc+(yyvsp[-2].vWord)+1, pc - ((yyvsp[-2].vWord) + sizeof(Word)+1));
       (yyval.vInt) = 1;
      }
-#line 2093 "y.tab.c"
+#line 2121 "y.tab.c"
     break;
 
-  case 70: /* @16: %empty  */
-#line 489 "lua.stx"
+  case 73: /* @18: %empty  */
+#line 497 "lua.stx"
      {
       code_byte(PUSHBYTE);
       (yyval.vWord) = pc; code_byte(0);
       incr_ntemp();
       code_byte(CREATEARRAY);
      }
-#line 2104 "y.tab.c"
+#line 2132 "y.tab.c"
     break;
 
-  case 71: /* typeconstructor: '@' @16 objectname fieldlist  */
-#line 496 "lua.stx"
+  case 74: /* typeconstructor: '@' @18 objectname fieldlist  */
+#line 504 "lua.stx"
      {
       basepc[(yyvsp[-2].vWord)] = (yyvsp[0].vInt); 
       if ((yyvsp[-1].vLong) < 0)	/* there is no function to be called */
@@ -2126,201 +2154,201 @@ PrintCode(code,code+pc);
        }
       }
      }
-#line 2131 "y.tab.c"
+#line 2159 "y.tab.c"
     break;
 
-  case 72: /* dimension: %empty  */
-#line 520 "lua.stx"
+  case 75: /* dimension: %empty  */
+#line 528 "lua.stx"
                                 { code_byte(PUSHNIL); incr_ntemp();}
-#line 2137 "y.tab.c"
+#line 2165 "y.tab.c"
     break;
 
-  case 74: /* @17: %empty  */
-#line 524 "lua.stx"
+  case 77: /* @19: %empty  */
+#line 532 "lua.stx"
                               {code_byte(PUSHMARK); (yyval.vInt) = ntemp; incr_ntemp();}
-#line 2143 "y.tab.c"
+#line 2171 "y.tab.c"
     break;
 
-  case 75: /* functioncall: functionvalue @17 '(' exprlist ')'  */
-#line 525 "lua.stx"
+  case 78: /* functioncall: functionvalue @19 '(' exprlist ')'  */
+#line 533 "lua.stx"
                                  { code_byte(CALLFUNC); ntemp = (yyvsp[-3].vInt)-1;}
-#line 2149 "y.tab.c"
+#line 2177 "y.tab.c"
     break;
 
-  case 76: /* functionvalue: var  */
-#line 527 "lua.stx"
-                    {lua_pushvar ((yyvsp[0].vLong)); }
-#line 2155 "y.tab.c"
-    break;
-
-  case 77: /* exprlist: %empty  */
-#line 530 "lua.stx"
-                                        { (yyval.vInt) = 1; }
-#line 2161 "y.tab.c"
-    break;
-
-  case 78: /* exprlist: exprlist1  */
-#line 531 "lua.stx"
-                                        { (yyval.vInt) = (yyvsp[0].vInt); }
-#line 2167 "y.tab.c"
-    break;
-
-  case 79: /* exprlist1: expr  */
-#line 534 "lua.stx"
-                                        { (yyval.vInt) = (yyvsp[0].vInt); }
-#line 2173 "y.tab.c"
-    break;
-
-  case 80: /* $@18: %empty  */
+  case 79: /* functionvalue: var  */
 #line 535 "lua.stx"
-                              {if (!(yyvsp[-1].vInt)){lua_codeadjust (ntemp+1); incr_ntemp();}}
-#line 2179 "y.tab.c"
+                    {lua_pushvar ((yyvsp[0].vLong)); }
+#line 2183 "y.tab.c"
     break;
 
-  case 81: /* exprlist1: exprlist1 ',' $@18 expr  */
-#line 536 "lua.stx"
-                      {(yyval.vInt) = (yyvsp[0].vInt);}
-#line 2185 "y.tab.c"
+  case 81: /* exprlist: %empty  */
+#line 539 "lua.stx"
+                                        { (yyval.vInt) = 1; }
+#line 2189 "y.tab.c"
     break;
 
-  case 84: /* parlist1: NAME  */
+  case 82: /* exprlist: exprlist1  */
+#line 540 "lua.stx"
+                                        { (yyval.vInt) = (yyvsp[0].vInt); }
+#line 2195 "y.tab.c"
+    break;
+
+  case 83: /* exprlist1: expr  */
+#line 543 "lua.stx"
+                                        { (yyval.vInt) = (yyvsp[0].vInt); }
+#line 2201 "y.tab.c"
+    break;
+
+  case 84: /* $@20: %empty  */
 #line 544 "lua.stx"
+                              {if (!(yyvsp[-1].vInt)){lua_codeadjust (ntemp+1); incr_ntemp();}}
+#line 2207 "y.tab.c"
+    break;
+
+  case 85: /* exprlist1: exprlist1 ',' $@20 expr  */
+#line 545 "lua.stx"
+                      {(yyval.vInt) = (yyvsp[0].vInt);}
+#line 2213 "y.tab.c"
+    break;
+
+  case 88: /* parlist1: NAME  */
+#line 553 "lua.stx"
                 {
 		 localvar[nlocalvar]=lua_findsymbol((yyvsp[0].pChar)); 
 		 add_nlocalvar(1);
 		}
-#line 2194 "y.tab.c"
+#line 2222 "y.tab.c"
     break;
 
-  case 85: /* parlist1: parlist1 ',' NAME  */
-#line 549 "lua.stx"
+  case 89: /* parlist1: parlist1 ',' NAME  */
+#line 558 "lua.stx"
                 {
 		 localvar[nlocalvar]=lua_findsymbol((yyvsp[0].pChar)); 
 		 add_nlocalvar(1);
 		}
-#line 2203 "y.tab.c"
+#line 2231 "y.tab.c"
     break;
 
-  case 86: /* objectname: %empty  */
-#line 555 "lua.stx"
+  case 90: /* objectname: %empty  */
+#line 564 "lua.stx"
                                 {(yyval.vLong)=-1;}
-#line 2209 "y.tab.c"
+#line 2237 "y.tab.c"
     break;
 
-  case 87: /* objectname: NAME  */
-#line 556 "lua.stx"
+  case 91: /* objectname: NAME  */
+#line 565 "lua.stx"
                                 {(yyval.vLong)=lua_findsymbol((yyvsp[0].pChar));}
-#line 2215 "y.tab.c"
+#line 2243 "y.tab.c"
     break;
 
-  case 88: /* fieldlist: '{' ffieldlist '}'  */
-#line 560 "lua.stx"
+  case 92: /* fieldlist: '{' ffieldlist '}'  */
+#line 569 "lua.stx"
               { 
 	       flush_record((yyvsp[-1].vInt)%FIELDS_PER_FLUSH); 
 	       (yyval.vInt) = (yyvsp[-1].vInt);
 	      }
-#line 2224 "y.tab.c"
+#line 2252 "y.tab.c"
     break;
 
-  case 89: /* fieldlist: '[' lfieldlist ']'  */
-#line 565 "lua.stx"
+  case 93: /* fieldlist: '[' lfieldlist ']'  */
+#line 574 "lua.stx"
               { 
 	       flush_list((yyvsp[-1].vInt)/FIELDS_PER_FLUSH, (yyvsp[-1].vInt)%FIELDS_PER_FLUSH);
 	       (yyval.vInt) = (yyvsp[-1].vInt);
      	      }
-#line 2233 "y.tab.c"
+#line 2261 "y.tab.c"
     break;
 
-  case 90: /* ffieldlist: %empty  */
-#line 571 "lua.stx"
+  case 94: /* ffieldlist: %empty  */
+#line 580 "lua.stx"
                            { (yyval.vInt) = 0; }
-#line 2239 "y.tab.c"
+#line 2267 "y.tab.c"
     break;
 
-  case 91: /* ffieldlist: ffieldlist1  */
-#line 572 "lua.stx"
+  case 95: /* ffieldlist: ffieldlist1  */
+#line 581 "lua.stx"
                            { (yyval.vInt) = (yyvsp[0].vInt); }
-#line 2245 "y.tab.c"
+#line 2273 "y.tab.c"
     break;
 
-  case 92: /* ffieldlist1: ffield  */
-#line 575 "lua.stx"
+  case 96: /* ffieldlist1: ffield  */
+#line 584 "lua.stx"
                                         {(yyval.vInt)=1;}
-#line 2251 "y.tab.c"
+#line 2279 "y.tab.c"
     break;
 
-  case 93: /* ffieldlist1: ffieldlist1 ',' ffield  */
-#line 577 "lua.stx"
+  case 97: /* ffieldlist1: ffieldlist1 ',' ffield  */
+#line 586 "lua.stx"
                 {
 		  (yyval.vInt)=(yyvsp[-2].vInt)+1;
 		  if ((yyval.vInt)%FIELDS_PER_FLUSH == 0) flush_record(FIELDS_PER_FLUSH);
 		}
-#line 2260 "y.tab.c"
+#line 2288 "y.tab.c"
     break;
 
-  case 94: /* @19: %empty  */
-#line 583 "lua.stx"
+  case 98: /* @21: %empty  */
+#line 592 "lua.stx"
                    {(yyval.vWord) = lua_findconstant((yyvsp[0].pChar));}
-#line 2266 "y.tab.c"
+#line 2294 "y.tab.c"
     break;
 
-  case 95: /* ffield: NAME @19 '=' expr1  */
-#line 584 "lua.stx"
+  case 99: /* ffield: NAME @21 '=' expr1  */
+#line 593 "lua.stx"
               { 
 	       push_field((yyvsp[-2].vWord));
 	      }
-#line 2274 "y.tab.c"
+#line 2302 "y.tab.c"
     break;
 
-  case 96: /* lfieldlist: %empty  */
-#line 589 "lua.stx"
+  case 100: /* lfieldlist: %empty  */
+#line 598 "lua.stx"
                            { (yyval.vInt) = 0; }
-#line 2280 "y.tab.c"
+#line 2308 "y.tab.c"
     break;
 
-  case 97: /* lfieldlist: lfieldlist1  */
-#line 590 "lua.stx"
+  case 101: /* lfieldlist: lfieldlist1  */
+#line 599 "lua.stx"
                            { (yyval.vInt) = (yyvsp[0].vInt); }
-#line 2286 "y.tab.c"
+#line 2314 "y.tab.c"
     break;
 
-  case 98: /* lfieldlist1: expr1  */
-#line 593 "lua.stx"
+  case 102: /* lfieldlist1: expr1  */
+#line 602 "lua.stx"
                      {(yyval.vInt)=1;}
-#line 2292 "y.tab.c"
+#line 2320 "y.tab.c"
     break;
 
-  case 99: /* lfieldlist1: lfieldlist1 ',' expr1  */
-#line 595 "lua.stx"
+  case 103: /* lfieldlist1: lfieldlist1 ',' expr1  */
+#line 604 "lua.stx"
                 {
 		  (yyval.vInt)=(yyvsp[-2].vInt)+1;
 		  if ((yyval.vInt)%FIELDS_PER_FLUSH == 0) 
 		    flush_list((yyval.vInt)/FIELDS_PER_FLUSH - 1, FIELDS_PER_FLUSH);
 		}
-#line 2302 "y.tab.c"
+#line 2330 "y.tab.c"
     break;
 
-  case 100: /* varlist1: var  */
-#line 603 "lua.stx"
+  case 104: /* varlist1: var  */
+#line 612 "lua.stx"
           {
 	   nvarbuffer = 0; 
            varbuffer[nvarbuffer] = (yyvsp[0].vLong); incr_nvarbuffer();
 	   (yyval.vInt) = ((yyvsp[0].vLong) == 0) ? 1 : 0;
 	  }
-#line 2312 "y.tab.c"
+#line 2340 "y.tab.c"
     break;
 
-  case 101: /* varlist1: varlist1 ',' var  */
-#line 609 "lua.stx"
+  case 105: /* varlist1: varlist1 ',' var  */
+#line 618 "lua.stx"
           { 
            varbuffer[nvarbuffer] = (yyvsp[0].vLong); incr_nvarbuffer();
 	   (yyval.vInt) = ((yyvsp[0].vLong) == 0) ? (yyvsp[-2].vInt) + 1 : (yyvsp[-2].vInt);
 	  }
-#line 2321 "y.tab.c"
+#line 2349 "y.tab.c"
     break;
 
-  case 102: /* var: NAME  */
-#line 616 "lua.stx"
+  case 106: /* var: NAME  */
+#line 625 "lua.stx"
           {
 	   Word s = lua_findsymbol((yyvsp[0].pChar));
 	   int local = lua_localname (s);
@@ -2329,62 +2357,62 @@ PrintCode(code,code+pc);
            else
 	    (yyval.vLong) = -(local+1);		/* return negative value */
 	  }
-#line 2334 "y.tab.c"
+#line 2362 "y.tab.c"
     break;
 
-  case 103: /* $@20: %empty  */
-#line 625 "lua.stx"
+  case 107: /* $@22: %empty  */
+#line 634 "lua.stx"
                     {lua_pushvar ((yyvsp[0].vLong));}
-#line 2340 "y.tab.c"
+#line 2368 "y.tab.c"
     break;
 
-  case 104: /* var: var $@20 '[' expr1 ']'  */
-#line 626 "lua.stx"
+  case 108: /* var: var $@22 '[' expr1 ']'  */
+#line 635 "lua.stx"
           {
 	   (yyval.vLong) = 0;		/* indexed variable */
 	  }
-#line 2348 "y.tab.c"
+#line 2376 "y.tab.c"
     break;
 
-  case 105: /* $@21: %empty  */
-#line 629 "lua.stx"
+  case 109: /* $@23: %empty  */
+#line 638 "lua.stx"
                     {lua_pushvar ((yyvsp[0].vLong));}
-#line 2354 "y.tab.c"
+#line 2382 "y.tab.c"
     break;
 
-  case 106: /* var: var $@21 '.' NAME  */
-#line 630 "lua.stx"
+  case 110: /* var: var $@23 '.' NAME  */
+#line 639 "lua.stx"
           {
 	   code_byte(PUSHSTRING);
 	   code_word(lua_findconstant((yyvsp[0].pChar))); incr_ntemp();
 	   (yyval.vLong) = 0;		/* indexed variable */
 	  }
-#line 2364 "y.tab.c"
+#line 2392 "y.tab.c"
     break;
 
-  case 107: /* localdeclist: NAME  */
-#line 637 "lua.stx"
+  case 111: /* localdeclist: NAME  */
+#line 646 "lua.stx"
                      {localvar[nlocalvar]=lua_findsymbol((yyvsp[0].pChar)); (yyval.vInt) = 1;}
-#line 2370 "y.tab.c"
+#line 2398 "y.tab.c"
     break;
 
-  case 108: /* localdeclist: localdeclist ',' NAME  */
-#line 639 "lua.stx"
+  case 112: /* localdeclist: localdeclist ',' NAME  */
+#line 648 "lua.stx"
             {
 	     localvar[nlocalvar+(yyvsp[-2].vInt)]=lua_findsymbol((yyvsp[0].pChar)); 
 	     (yyval.vInt) = (yyvsp[-2].vInt)+1;
 	    }
-#line 2379 "y.tab.c"
+#line 2407 "y.tab.c"
     break;
 
-  case 111: /* setdebug: DEBUG  */
-#line 649 "lua.stx"
+  case 115: /* setdebug: DEBUG  */
+#line 658 "lua.stx"
                   {lua_debug = (yyvsp[0].vInt);}
-#line 2385 "y.tab.c"
+#line 2413 "y.tab.c"
     break;
 
 
-#line 2389 "y.tab.c"
+#line 2417 "y.tab.c"
 
       default: break;
     }
@@ -2577,7 +2605,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 651 "lua.stx"
+#line 660 "lua.stx"
 
 
 /*
@@ -2717,6 +2745,68 @@ void code_compound_finish(long var_info, int op_code) {
         code_byte(-(var_info + 1));
     }
 }
+
+
+
+// 开启函数编译作用域
+void lua_begin_scope(int symbol_idx) {
+    // 备份主程序现场
+    save_pc = pc;
+    save_basepc = basepc;
+    save_maxcurr = maxcurr;
+    save_nlocalvar = nlocalvar;
+    save_ntemp = ntemp;
+
+    // 为匿名函数开辟全新的独立缓冲区
+    basepc = (Byte *) calloc(GAPCODE, sizeof(Byte));
+    if (basepc == NULL) lua_error("not enough memory");
+    
+    code = basepc;     // 切换当前写入指针到新内存
+    pc = 0;            // 匿名函数的代码从 0 开始
+    maxcurr = GAPCODE; // 新缓冲区的容量
+    nlocalvar = 0;     // 重置局部变量计数
+    ntemp = 0; // 匿名函数内部从 0 开始算临时变量
+
+    // 复用调试逻辑：标记当前正在编译哪个函数
+    if (lua_debug) {
+        code_byte(SETFUNCTION); 
+        code_word(lua_nfile - 1);
+        code_word(symbol_idx);
+    }
+}
+
+// 结束函数编译作用域
+void lua_end_scope(int symbol_idx) {
+    if (lua_debug) code_byte(RESET); 
+    
+    // 生成返回指令
+    code_byte(RETCODE); 
+    code_byte(nlocalvar);
+    
+    // 物理存储到符号表
+    s_tag(symbol_idx) = T_FUNCTION;
+    
+    // 内存安全：释放该槽位旧的代码
+    if (s_bvalue(symbol_idx)) free(s_bvalue(symbol_idx)); 
+    
+    s_bvalue(symbol_idx) = (Byte *) calloc(pc, sizeof(Byte));
+    if (s_bvalue(symbol_idx) == NULL) lua_error("not enough memory");
+    
+    memcpy(s_bvalue(symbol_idx), basepc, pc * sizeof(Byte));
+    
+    // 彻底恢复主程序的现场
+    basepc = save_basepc;
+    pc = save_pc;
+    maxcurr = save_maxcurr;
+    nlocalvar = save_nlocalvar;
+    ntemp = save_ntemp;
+    if (basepc == initcode) {
+        maincode = pc; 
+    }
+}
+
+
+
 
 #if LISTING
 /*
