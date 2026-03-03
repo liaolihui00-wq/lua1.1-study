@@ -48,6 +48,7 @@ static int save_pc;
 static int save_maxcurr;
 static int save_nlocalvar;
 static int save_ntemp;
+static int n_anonymous_f=0;
 
 
 /* 声明加在 lua.stx 头部的 %{ 和 %} 之间 */
@@ -281,9 +282,6 @@ function     : FUNCTION NAME
             END 	 
 	       {
             lua_end_scope($<vWord>3);
-#if LISTING
-PrintCode(code,code+pc);
-#endif
 	       }
 	       ;
 
@@ -303,10 +301,6 @@ anonymous_function:'(' FUNCTION
                 lua_end_scope($<vWord>3); 
                 // 定义完立刻压栈，供 functioncall 使用
                 lua_pushvar($<vWord>3+1);
-
-#if LISTING
-PrintCode(code,code+pc);
-#endif
 	       }
 	       ;
 
@@ -808,13 +802,20 @@ void lua_begin_scope(int symbol_idx) {
     save_nlocalvar = nlocalvar;
     save_ntemp = ntemp;
 
-    // 为匿名函数开辟全新的独立缓冲区
-    basepc = (Byte *) calloc(GAPCODE, sizeof(Byte));
-    if (basepc == NULL) lua_error("not enough memory");
+    if (code == NULL)	/* first function */
+	{
+		 code = (Byte *) calloc(GAPCODE, sizeof(Byte));
+		 if (code == NULL)
+		 {
+		  lua_error("not enough memory");
+		  err = 1;
+		 }
+		 maxcode = GAPCODE;
+	}
     
-    code = basepc;     // 切换当前写入指针到新内存
+    basepc = code;     // 切换当前写入指针到新内存
     pc = 0;            // 匿名函数的代码从 0 开始
-    maxcurr = GAPCODE; // 新缓冲区的容量
+    maxcurr = maxcode; // 新缓冲区的容量
     nlocalvar = 0;     // 重置局部变量计数
     ntemp = 0; // 匿名函数内部从 0 开始算临时变量
 
@@ -837,23 +838,27 @@ void lua_end_scope(int symbol_idx) {
     // 物理存储到符号表
     s_tag(symbol_idx) = T_FUNCTION;
     
-    // 内存安全：释放该槽位旧的代码
-    if (s_bvalue(symbol_idx)) free(s_bvalue(symbol_idx)); 
-    
     s_bvalue(symbol_idx) = (Byte *) calloc(pc, sizeof(Byte));
-    if (s_bvalue(symbol_idx) == NULL) lua_error("not enough memory");
+    if (s_bvalue(symbol_idx) == NULL) {
+        lua_error("not enough memory");
+        err = 1;
+    }
     
     memcpy(s_bvalue(symbol_idx), basepc, pc * sizeof(Byte));
     
+    code=basepc;
+    maxcode=maxcurr;
+
+#if LISTING
+PrintCode(code,code+pc);
+#endif
+
     // 彻底恢复主程序的现场
     basepc = save_basepc;
     pc = save_pc;
     maxcurr = save_maxcurr;
     nlocalvar = save_nlocalvar;
     ntemp = save_ntemp;
-    if (basepc == initcode) {
-        maincode = pc; 
-    }
 }
 
 
