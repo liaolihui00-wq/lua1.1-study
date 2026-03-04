@@ -81,7 +81,9 @@ typedef enum
  HALT,//停止Lua虚拟机的执行，适用于程序结束或遇到不可恢复错误的情况
  SETFUNCTION,//将一个函数定义推入Lua栈顶，适用于函数定义的情况
  SETLINE,//设置当前行号，适用于调试信息和错误报告中显示正确的行号的情况
- RESET//重置Lua虚拟机的状态，适用于重新初始化虚拟机或清理资源的情况
+ RESET,//重置Lua虚拟机的状态，适用于重新初始化虚拟机或清理资源的情况
+ FORPREP,
+ FORLOOP
 } OpCode;//Lua虚拟机支持的所有指令的枚举类型，每个指令对应一个操作码（OpCode），Lua虚拟机通过执行这些指令来实现Lua代码的功能
 
 typedef enum
