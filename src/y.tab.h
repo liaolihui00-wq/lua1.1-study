@@ -77,14 +77,16 @@ extern int yydebug;
     MULTEQ = 278,                  /* MULTEQ  */
     DIVEQ = 279,                   /* DIVEQ  */
     FOR = 280,                     /* FOR  */
-    AND = 281,                     /* AND  */
-    OR = 282,                      /* OR  */
-    NE = 283,                      /* NE  */
-    LE = 284,                      /* LE  */
-    GE = 285,                      /* GE  */
-    CONC = 286,                    /* CONC  */
-    UNARY = 287,                   /* UNARY  */
-    NOT = 288                      /* NOT  */
+    BREAK = 281,                   /* BREAK  */
+    CONTINUE = 282,                /* CONTINUE  */
+    AND = 283,                     /* AND  */
+    OR = 284,                      /* OR  */
+    NE = 285,                      /* NE  */
+    LE = 286,                      /* LE  */
+    GE = 287,                      /* GE  */
+    CONC = 288,                    /* CONC  */
+    UNARY = 289,                   /* UNARY  */
+    NOT = 290                      /* NOT  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -116,20 +118,22 @@ extern int yydebug;
 #define MULTEQ 278
 #define DIVEQ 279
 #define FOR 280
-#define AND 281
-#define OR 282
-#define NE 283
-#define LE 284
-#define GE 285
-#define CONC 286
-#define UNARY 287
-#define NOT 288
+#define BREAK 281
+#define CONTINUE 282
+#define AND 283
+#define OR 284
+#define NE 285
+#define LE 286
+#define GE 287
+#define CONC 288
+#define UNARY 289
+#define NOT 290
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 215 "lua.stx"
+#line 241 "lua.stx"
 
  int   vInt;
  long  vLong;
@@ -138,7 +142,7 @@ union YYSTYPE
  Word  vWord;
  Byte *pByte;
 
-#line 142 "y.tab.h"
+#line 146 "y.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
